@@ -12,6 +12,7 @@ class ProposalLayer:
                  n_pre_nms_test=6000,
                  n_post_nms_test=300,
                  min_bbox_size=16):
+
         self.extractor = extractor
         self.nms_thresh = nms_thresh
         self.n_pre_nms_train  = n_pre_nms_train
@@ -29,6 +30,27 @@ class ProposalLayer:
             n_post_nms = self.n_post_nms_test
 
         rois = anchor2pred_bbox(anchor, reg)
+        rois[:, slice(0, 4, 2)] = np.clip(rois[:, slice(0, 4, 2)], 0, img_size[0])  # clipping x-axis
+        rois[:, slice(1, 4, 2)] = np.clip(rois[:, slice(1, 4, 2)], 0, img_size[1])  # clipping y-axis
 
+        # discard bbox whose size < min_bbox_size
+        min_bbox_size = self.min_bbox_size * img_scale
+        w = rois[:, 2] - rois[:, 0]
+        h = rois[:, 3] - rois[:, 1]
+        keep = np.where((w >= min_bbox_size) & (h >= min_bbox_size))[0]
+        rois = rois[keep, :]
+        cls = cls[keep, :]
+
+        # sort bbox according to cls probability
+        order = np.argsort(-cls[:, 0])
+        if n_pre_nms > 0:
+            order = order[:n_pre_nms]
+        rois = rois[order, :]
+        # TODO NMS function.
+        # keep = NMS(rois, thresh=self.nms_thresh)
+        if n_post_nms > 0:
+            keep = keep[:n_post_nms]
+        rois = rois[keep]
+        return rois
 
 
