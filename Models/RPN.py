@@ -1,7 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from utils.ProposalLayer import ProposalLayer
-from utils.anchors import generate_anchor_base, all_anchors
+import numpy as np
+from Models.utils.ProposalLayer import ProposalLayer
+from Models.utils.anchors import generate_anchor_base, all_anchors
 
 
 class RPN(nn.Module):
@@ -46,6 +47,9 @@ class RPN(nn.Module):
 
         reg = self.reg(shared)
         reg = reg.permute(0, 2, 3, 1).contiguous().view(bat, -1, 4)  # shape (B, h * w * n_a, 4)
+
+        roi_list = list()
+        roi_id = list()
         for i in range(bat):
             roi = self.ProposalLayer(
                 cls[i].cpu().data.numpy(),
@@ -54,6 +58,14 @@ class RPN(nn.Module):
                 img_size,
                 img_scale
             )
+            batch_id = i * np.ones((len(roi),), dtype=np.int32)
+            roi_list.append(roi)
+            roi_id.append(batch_id)
 
-        # TODO Proposal Layer & Proposal Target Layer
+        np.concatenate(roi_list, axis=0)
+        roi_id = np.concatenate(roi_id, axis=0)
+
+        return reg, cls, roi_list, roi_id, anchors
+
+        # TODO Proposal Target Layer
 

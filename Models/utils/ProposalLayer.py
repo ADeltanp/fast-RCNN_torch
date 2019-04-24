@@ -1,7 +1,6 @@
 import numpy as np
-import torch as t
-import torch.nn as nn
-from utils.anchors import anchor2pred_bbox
+from Models.utils.anchors import anchor2pred_bbox
+from Models.utils.nms.non_maximum_suppression import non_maximum_suppression as NMS
 
 class ProposalLayer:
     def __init__(self,
@@ -46,11 +45,9 @@ class ProposalLayer:
         if n_pre_nms > 0:
             order = order[:n_pre_nms]
         rois = rois[order, :]
-        # TODO NMS function.
-        # keep = NMS(rois, thresh=self.nms_thresh)
+
+        keep = NMS(rois, thresh=self.nms_thresh)
         if n_post_nms > 0:
             keep = keep[:n_post_nms]
         rois = rois[keep]
         return rois
-
-
