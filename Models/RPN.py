@@ -33,16 +33,27 @@ class RPN(nn.Module):
         )
         return x
 
-    def forward(self, x):
+    def forward(self, x, img_size, img_scale=1.0):
         bat, _, h, w = x.shape
         anchors = all_anchors(self.anchor, self.feat_receptive_len, h, w)
+        num_anchors = anchors[0]
 
         shared = self.share(x)
         cls = self.cls(shared)
-        cls = self._reshape(cls, 2)  # shape (B, 2, (H * 9), W)
-        cls = F.softmax(cls, 1)
-        cls = self._reshape(cls, 18)  # shape (B, 18, H, W)
+        cls = cls.permute(0, 2, 3, 1).contiguous().view(bat, h, w, num_anchors, 2)  # shape (B, h, w, n_a, 2)
+        cls = F.softmax(cls, dim=4)
+        cls = cls.view(bat, -1, 2)
+
         reg = self.reg(shared)
-        out = self.ProposalLayer(cls, reg, self.anchor, self.img_size, self.img_scale)
+        reg = reg.permute(0, 2, 3, 1).contiguous().view(bat, -1, 4)  # shape (B, h * w * n_a, 4)
+        for i in range(bat):
+            roi = self.ProposalLayer(
+                cls[i].cpu().data.numpy(),
+                reg[i].cpu().data.numpy(),
+                anchors,
+                img_size,
+                img_scale
+            )
+
         # TODO Proposal Layer & Proposal Target Layer
 
