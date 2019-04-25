@@ -67,5 +67,3 @@ class RPN(nn.Module):
 
         return reg, cls, roi_list, roi_id, anchors
 
-        # TODO Proposal Target Layer
-
