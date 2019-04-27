@@ -18,7 +18,7 @@ def generate_anchor_base(base_size=16, scale=[8, 16, 32],  ratio=[0.5, 1.0, 2.0]
     return anchor
 
 
-def all_anchors(anchor_base, feat_receptive_len, h, w):
+def all_anchors(anchor_base, feat_receptive_len, h, w, phase='test'):
     x = np.arange(0, w * feat_receptive_len, feat_receptive_len)
     y = np.arange(0, h * feat_receptive_len, feat_receptive_len)
     x, y = np.meshgrid(x, y)
@@ -28,11 +28,24 @@ def all_anchors(anchor_base, feat_receptive_len, h, w):
     num_shift = ctr_shift.shape[0]
     anchors = anchor_base.reshape((1, num_base, 4)) + ctr_shift.reshape((1, num_shift, 4)).transpose((1, 0, 2))
     anchors = anchors.reshape((num_base * num_shift, 4)).astype(np.float32)
+    if phase is 'train':
+        valid_index = np.where(
+            (anchors[:, 0] >= 0) &
+            (anchors[:, 1] >= 0) &
+            (anchors[:, 2] <= 800) &
+            (anchors[:, 3] <= 800)
+        )
+        anchors = anchors[valid_index, :]
     return anchors
 
 
-def anchor2pred_bbox(anchor, reg):
+def decode_to_bbox(anchor, reg):
     '''
+    decode t_x, t_y, t_h, t_w to bounding box, x_min, x_max, y_min, y_max
+
+    anchor[i, :] = x_a_min, y_a_min, x_a_max, y_a_max, offsets of i th anchor
+    reg[i, :] = t_x, t_y, t_w, t_h, output of reg layer
+
     :param anchor: all anchor boxes over the image of shape (N, 4)
     :param reg: regression output by RPN of shape (N, 4)
     :return: the predicted bounding box of shape (N, 4)
@@ -66,3 +79,6 @@ def anchor2pred_bbox(anchor, reg):
     pred_bbox[:, 3::4] = pred_y + pred_h * 0.5  # max_y of bbox
 
     return pred_bbox
+
+def encode_from_bbox(anchor, pred):
+    

@@ -11,7 +11,7 @@ class RPN(nn.Module):
         self.extractor = extractor
         self.img_size = img_size
         self.img_scale = img_scale
-        self.anchor = generate_anchor_base()
+        self.anchor_base = generate_anchor_base()
         if extractor is "VGG16":
             self.feat_receptive_len = 16
 
@@ -34,9 +34,9 @@ class RPN(nn.Module):
         )
         return x
 
-    def forward(self, x, img_size, img_scale=1.0):
+    def forward(self, x, img_size, img_scale=1.0, phase='test'):
         bat, _, h, w = x.shape
-        anchors = all_anchors(self.anchor, self.feat_receptive_len, h, w)
+        anchors = all_anchors(self.anchor_base, self.feat_receptive_len, h, w, phase=phase)
         num_anchors = anchors[0]
 
         shared = self.share(x)
