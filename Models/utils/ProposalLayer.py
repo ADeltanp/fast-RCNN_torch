@@ -1,5 +1,5 @@
 import numpy as np
-from Models.utils.anchors import decode_to_bbox
+from Models.utils.boundingbox import t_encoded2bbox
 from Models.utils.nms.non_maximum_suppression import non_maximum_suppression as NMS
 
 
@@ -29,7 +29,7 @@ class ProposalLayer:
             n_pre_nms  = self.n_pre_nms_test
             n_post_nms = self.n_post_nms_test
 
-        rois = decode_to_bbox(anchor, reg)
+        rois = t_encoded2bbox(anchor, reg)
         rois[:, slice(0, 4, 2)] = np.clip(rois[:, slice(0, 4, 2)], 0, img_size[0])  # clipping x-axis
         rois[:, slice(1, 4, 2)] = np.clip(rois[:, slice(1, 4, 2)], 0, img_size[1])  # clipping y-axis
 
