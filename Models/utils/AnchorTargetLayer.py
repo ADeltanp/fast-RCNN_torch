@@ -1,6 +1,6 @@
 import numpy as np
 import cupy as cp
-from .boundingbox import bbox2t_encoded, iou
+from .boundingbox import bbox2t_encoded, compute_iou
 
 
 class AnchorTargetLayer:
@@ -8,11 +8,11 @@ class AnchorTargetLayer:
                  n_sample=256,
                  positive_thresh=0.7,
                  negative_thresh=0.3,
-                 pn_ratio=0.5):
+                 positive_ratio=0.5):
         self.n_sample = n_sample
-        self.positive_thresh = 0.7
-        self.negative_thresh = 0.3
-        self.pn_ratio = pn_ratio
+        self.positive_thresh = positive_thresh
+        self.negative_thresh = negative_thresh
+        self.positive_ratio = positive_ratio
 
     def __call__(self, gt_bbox, anchor):
         max_iou_id, labels = self._label(anchor, gt_bbox)
@@ -32,7 +32,7 @@ class AnchorTargetLayer:
         labels[gt_max_iou_id] = 1
         labels[max_iou > self.positive_thresh] = 1
 
-        n_positives = int(self.pn_ratio * self.n_sample)
+        n_positives = int(self.positive_ratio * self.n_sample)
         positive_id = xp.where(labels == 1)[0]
         if len(positive_id) > n_positives:
             discard_id = xp.random.choice(positive_id,
@@ -40,7 +40,7 @@ class AnchorTargetLayer:
                                           replace=False)
             labels[discard_id] = -1
 
-        n_negatives = self.n_sample - n_positives
+        n_negatives = self.n_sample - xp.sum(labels == 1)
         negative_id = xp.where(labels == 0)[0]
         if len(negative_id) > n_negatives:
             discard_id = xp.random.choice(negative_id,
@@ -53,7 +53,7 @@ class AnchorTargetLayer:
     def _ious(self, anchor, gt_bbox):
         # cupy compatible TODO Compatibility Not Tested
         xp = cp.get_array_module(anchor)
-        ious = iou(anchor, gt_bbox)  # shape (N, K), N anchors, K gt
+        ious = compute_iou(anchor, gt_bbox)  # shape (N, K), N anchors, K gt
 
         # axis 0 is the max anchor of every gt_bbox, axis 1 is gt_bbox of every anchor
         max_iou_id = ious.argmax(axis=1)  # shape (N, )

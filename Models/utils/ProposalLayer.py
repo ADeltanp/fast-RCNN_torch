@@ -21,8 +21,8 @@ class ProposalLayer:
         self.n_post_nms_test  = n_post_nms_test
         self.min_bbox_size = min_bbox_size
 
-    def __call__(self, cls, reg, anchor, img_size, img_scale):
-        if self.extractor.training:
+    def __call__(self, cls, reg, anchor, img_size, img_scale, phase):
+        if phase is 'train':
             n_pre_nms  = self.n_pre_nms_train
             n_post_nms = self.n_post_nms_train
         else:
@@ -47,6 +47,7 @@ class ProposalLayer:
             order = order[:n_pre_nms]
         rois = rois[order, :]
 
+        # TODO Implement NMS by myself
         keep = NMS(rois, thresh=self.nms_thresh)
         if n_post_nms > 0:
             keep = keep[:n_post_nms]

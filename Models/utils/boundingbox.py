@@ -127,7 +127,8 @@ def bbox2t_encoded(anchor, target_bbox):
     t_encoded = xp.vstack((t_x, t_y, t_w, t_h)).transpose()
     return t_encoded
 
-def iou(bbox_a, bbox_b):
+
+def compute_iou(bbox_a, bbox_b):
     # cupy compatible TODO Compatibility Not Tested
     xp = cp.get_array_module(bbox_a)
 

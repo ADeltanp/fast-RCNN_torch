@@ -7,7 +7,8 @@ from Models.utils.boundingbox import generate_anchor_base, all_anchors
 
 
 class RPN(nn.Module):
-    def __init__(self, RPN, extractor, img_size, img_scale, cp_enable=False):
+    def __init__(self, RPN, extractor, img_size, img_scale,
+                 init_mean=0, init_std=0.01, cp_enable=False):
         super(RPN, self).__init__()
         self.extractor = extractor
         self.img_size = img_size
@@ -24,6 +25,7 @@ class RPN(nn.Module):
         self.cls = nn.Conv2d(512, 18, 1, padding=0)
         self.reg = nn.Conv2d(512, 36, 1, padding=0)
         self.ProposalLayer = ProposalLayer(self.extractor)
+        self._initialize_params(init_mean, init_std)
 
     def forward(self, x, img_size, img_scale=1.0, phase='test'):
         # cupy compatible TODO Compatibility Not Tested
@@ -44,6 +46,7 @@ class RPN(nn.Module):
         reg = self.reg(shared)
         reg = reg.permute(0, 2, 3, 1).contiguous().view(bat, -1, 4)  # shape (B, h * w * n_a, 4)
 
+        # roi is not encoded tuple (not t_x, t_y, ... but x_min, x_max, ...)
         roi_list = list()
         roi_id = list()
         for i in range(bat):
@@ -52,7 +55,8 @@ class RPN(nn.Module):
                 reg[i].cpu().data.numpy(),
                 anchors,
                 img_size,
-                img_scale
+                img_scale,
+                phase
             )
             batch_id = i * xp.ones((len(roi),), dtype=xp.int32)
             roi_list.append(roi)
@@ -62,4 +66,9 @@ class RPN(nn.Module):
         roi_id = xp.concatenate(roi_id, axis=0)
 
         return reg, cls, roi_list, roi_id, anchors
+
+    def _initialize_params(self, mean, std):
+        self.share[0].weight.data.normal_(mean, std)
+        self.cls.weight.data.normal_(mean, std)
+        self.reg.weight.data.normal_(mean, std)
 
