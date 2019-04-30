@@ -12,18 +12,26 @@ def generate_anchor_base(base_size=16,
     else:
         xp = np
 
+    scale = xp.array(scale, dtype=xp.float32)[:, np.newaxis]  # shape (3, 1)
+    ratio = xp.array(ratio, dtype=xp.float32)[:, np.newaxis]  # shape (3, 1)
     anchor = xp.zeros((len(scale) * len(ratio), 4), dtype=xp.float32)
     ctr_x = base_size / 2.0
     ctr_y = base_size / 2.0
-    for i in range(len(ratio)):
-        for j in range(len(scale)):
-            h = base_size * scale[j] * xp.sqrt(ratio[i])
-            w = base_size * scale[j] * xp.sqrt(1.0 / ratio[i])
-            idx = i * len(scale) + j
-            anchor[idx, 0] = ctr_x - w / 2.0  # x_min of idx th ratio
-            anchor[idx, 1] = ctr_y - h / 2.0  # y_min of idx th ratio
-            anchor[idx, 2] = ctr_x + w / 2.0  # x_max of idx th ratio
-            anchor[idx, 3] = ctr_y + h / 2.0  # y_max of idx th ratio
+
+    anchor[:, 0].fill(ctr_x)
+    anchor[:, 1].fill(ctr_y)
+    anchor[:, 2].fill(ctr_x)
+    anchor[:, 3].fill(ctr_y)
+
+    # matmul produces [3, 3] matrix, reshape into (9, 1) array
+    h = base_size * xp.matmul(scale, xp.sqrt(ratio).transpose()).reshape(-1, 1)
+    w = base_size * xp.matmul(scale, xp.sqrt(1 / ratio).transpose()).reshape(-1, 1)
+
+    anchor[:, 0] -= w / 2.0  # x_min of idx th ratio
+    anchor[:, 1] -= h / 2.0  # y_min of idx th ratio
+    anchor[:, 2] += w / 2.0  # x_max of idx th ratio
+    anchor[:, 3] += h / 2.0  # y_max of idx th ratio
+
     return anchor
 
 
@@ -37,7 +45,9 @@ def all_anchors(anchor_base, feat_receptive_len, h, w, phase='test'):
     ctr_shift = xp.stack((x.ravel(), y.ravel(), x.ravel(), y.ravel()), axis=1)
     num_base = anchor_base.shape[0]
     num_shift = ctr_shift.shape[0]
-    anchors = anchor_base.reshape((1, num_base, 4)) + ctr_shift.reshape((1, num_shift, 4)).transpose((1, 0, 2))
+
+    # shape (1, 9, 4) + (num_shift, 1, 4) = (num_shift, 9, 4), num_base = 9 by default
+    anchors = anchor_base[xp.newaxis, :] + ctr_shift[xp.newaxis, :].transpose((1, 0, 2))
     anchors = anchors.reshape((num_base * num_shift, 4)).astype(xp.float32)
     if phase is 'train':
         valid_index = xp.where(
@@ -56,7 +66,7 @@ def t_encoded2bbox(anchor, t_encoded):
     decode t_x, t_y, t_h, t_w to bounding box, x_min, x_max, y_min, y_max
 
     anchor[i, :] = x_a_min, y_a_min, x_a_max, y_a_max, offset of i th anchor
-    t_encoded[i, :] = t_x, t_y, t_w, t_h, output of reg layer or encoded gt
+    t_encoded[i, :] = t_x, t_y, t_h, t_w, output of reg layer or encoded gt
 
     :param anchor: all anchor boxes over the image of shape (N, 4)
     :param t_encoded: regression output by RPN of shape (N, 4)
@@ -81,15 +91,15 @@ def t_encoded2bbox(anchor, t_encoded):
 
     t_x = t_encoded[:, 0]  # shape (N, )
     t_y = t_encoded[:, 1]  # shape (N, )
-    t_w = t_encoded[:, 2]  # shape (N, )
-    t_h = t_encoded[:, 3]  # shape (N, )
+    t_h = t_encoded[:, 2]  # shape (N, )
+    t_w = t_encoded[:, 3]  # shape (N, )
 
     tgt_x = t_x * w_a + x_a    # shape (N, )
     tgt_y = t_y * h_a + y_a    # shape (N, )
-    tgt_w = xp.exp(t_w) * w_a  # shape (N, )
     tgt_h = xp.exp(t_h) * h_a  # shape (N, )
+    tgt_w = xp.exp(t_w) * w_a  # shape (N, )
 
-    target_bbox = xp.vstack((tgt_x, tgt_y, tgt_w, tgt_h)).transpose()
+    target_bbox = xp.vstack((tgt_x, tgt_y, tgt_h, tgt_w)).transpose()
     return target_bbox
 
 
@@ -121,15 +131,16 @@ def bbox2t_encoded(anchor, target_bbox):
 
     t_x = (tgt_x - x_a) / w_a
     t_y = (tgt_y - y_a) / h_a
-    t_w = xp.log(tgt_w / w_a)
     t_h = xp.log(tgt_h / h_a)
+    t_w = xp.log(tgt_w / w_a)
 
-    t_encoded = xp.vstack((t_x, t_y, t_w, t_h)).transpose()
+    t_encoded = xp.vstack((t_x, t_y, t_h, t_w)).transpose()
     return t_encoded
 
 
 def compute_iou(bbox_a, bbox_b):
     # cupy compatible TODO Compatibility Not Tested
+    # bbox of (x, y, x, y), not (x, y, h, w)
     xp = cp.get_array_module(bbox_a)
 
     # newaxis here is to utilize broadcasting to compare between each element in a and b

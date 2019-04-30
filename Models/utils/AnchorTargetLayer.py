@@ -1,4 +1,3 @@
-import numpy as np
 import cupy as cp
 from .boundingbox import bbox2t_encoded, compute_iou
 

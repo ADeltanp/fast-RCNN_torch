@@ -1,4 +1,4 @@
-import numpy as np
+import cupy as cp
 from Models.utils.boundingbox import t_encoded2bbox
 from Models.utils.nms.non_maximum_suppression import non_maximum_suppression as NMS
 
@@ -22,6 +22,9 @@ class ProposalLayer:
         self.min_bbox_size = min_bbox_size
 
     def __call__(self, cls, reg, anchor, img_size, img_scale, phase):
+        # cupy compatible TODO Compatibility Not Tested
+        xp = cp.get_array_module(anchor)
+
         if phase is 'train':
             n_pre_nms  = self.n_pre_nms_train
             n_post_nms = self.n_post_nms_train
@@ -30,19 +33,19 @@ class ProposalLayer:
             n_post_nms = self.n_post_nms_test
 
         rois = t_encoded2bbox(anchor, reg)
-        rois[:, slice(0, 4, 2)] = np.clip(rois[:, slice(0, 4, 2)], 0, img_size[0])  # clipping x-axis
-        rois[:, slice(1, 4, 2)] = np.clip(rois[:, slice(1, 4, 2)], 0, img_size[1])  # clipping y-axis
+        rois[:, slice(0, 4, 2)] = xp.clip(rois[:, slice(0, 4, 2)], 0, img_size[0])  # clipping x-axis
+        rois[:, slice(1, 4, 2)] = xp.clip(rois[:, slice(1, 4, 2)], 0, img_size[1])  # clipping y-axis
 
         # discard bbox whose size < min_bbox_size
         min_bbox_size = self.min_bbox_size * img_scale
         w = rois[:, 2] - rois[:, 0]
         h = rois[:, 3] - rois[:, 1]
-        keep = np.where((w >= min_bbox_size) & (h >= min_bbox_size))[0]
+        keep = xp.where((w >= min_bbox_size) & (h >= min_bbox_size))[0]
         rois = rois[keep, :]
         cls = cls[keep, :]
 
         # sort bbox according to cls probability
-        order = np.argsort(-cls[:, 0])
+        order = xp.argsort(-cls[:, 0])
         if n_pre_nms > 0:
             order = order[:n_pre_nms]
         rois = rois[order, :]

@@ -46,7 +46,7 @@ class RPN(nn.Module):
         reg = self.reg(shared)
         reg = reg.permute(0, 2, 3, 1).contiguous().view(bat, -1, 4)  # shape (B, h * w * n_a, 4)
 
-        # roi is not encoded tuple (not t_x, t_y, ... but x_min, x_max, ...)
+        # roi is not (x, y, h, w) but (x, y, x, y)
         roi_list = list()
         roi_id = list()
         for i in range(bat):
