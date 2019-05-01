@@ -58,12 +58,15 @@ class RPN(nn.Module):
                 img_scale,
                 phase
             )
-            batch_id = i * xp.ones((len(roi),), dtype=xp.int32)
+            batch_id = i * np.ones((len(roi),), dtype=xp.int32)
             roi_list.append(roi)
             roi_id.append(batch_id)
 
         xp.concatenate(roi_list, axis=0)
-        roi_id = xp.concatenate(roi_id, axis=0)
+        roi_id = np.concatenate(roi_id, axis=0)
+
+        if xp is cp:
+            roi_list = cp.asnumpy(roi_list)
 
         return reg, cls, roi_list, roi_id, anchors
 

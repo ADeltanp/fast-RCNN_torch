@@ -81,3 +81,86 @@ __global__ void roi_forward(
 	max_id[idx] = max_idx;
 }
 '''
+
+backward_kernel = '''
+extern "C"
+__global__ void roi_backward(
+	const float* const input_grad,
+	const int* const max_idx,
+	const float* const rois,
+	float* out_grad,
+	const int num_rois,
+	const double scale,
+	const int c, const int h, const int w,
+	const int pooled_h, const int pooled_w,
+	const int num_grad_out
+)
+{
+	#define  MAX(x,y)    ((x) > (y) ? (x) : (y))
+	#define  MIN(x,y)    ((x) < (y) ? (x) : (y))
+	// process each feature on the feature map BEFORE pooling
+	// args are almost the same as forward function above
+
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= num_grad_out) return;
+
+	// pooling positions of shape(N, C, H, W), hence handle W first, then H, C, N
+	const int feat_w_th = idx % w;  // w_th position of a row on unpooled feat map
+	const int feat_h_th = (idx / w) % h;  // h_th position of a col on unpooled feat map
+	const int c_th = (idx / w / h) % c;  // c_th channel
+	// num_th feat map of all batches, aka num_th batch
+	const int num = idx / (w * h * c);
+
+	float grad = 0;
+	for (int roi_n = 0; roi_n < num_rois; ++roi_n)
+	{
+		// skip rois which are not in this image
+		if(num != static_cast<int>(rois[roi_n * 5])) continue;
+
+		const int roi_w_start = round(rois[roi_n * 5 + 1] * scale);
+		const int roi_h_start = round(rois[roi_n * 5 + 2] * scale);
+		const int roi_w_end = round(rois[roi_n * 5 + 3] * scale);
+		const int roi_h_end = round(rois[roi_n * 5 + 4] * scale);
+
+		// skip if the feature processing is not within this roi
+		const bool contain_this_feat = (feat_w_th >= roi_w_start && feat_w_th <= roi_w_end &&
+										feat_h_th >= roi_h_start && feat_h_th <= roi_h_end);
+		if (!contain_this_feat) continue;
+
+		// the c_th channel of pooled feat map, on which the current feat lies, starts point
+		const int pooled_data_offset = (roi_n * c + c_th) * pooled_h * pooled_w;
+
+		const int roi_w = MAX(roi_w_end - roi_w_start + 1, 1);
+		const int roi_h = MAX(roi_h_end - roi_h_start + 1, 1);
+
+		// pooling stride corresponding to this roi
+		const float stride_w = static_cast<float>(roi_w) / static_cast<float>(pooled_w);
+		const float stride_h = static_cast<float>(roi_h) / static_cast<float>(pooled_h);
+
+		// current processing feat must be at between 'floor' and 'ceil'
+		int pooled_w_start = floor(static_cast<float>(feat_w_th - roi_w_start) / stride_w);
+		int pooled_h_start = floor(static_cast<float>(feat_h_th - roi_h_start) / stride_h);
+		int pooled_w_end = ceil(static_cast<float>(feat_w_th - roi_w_start + 1) / stride_w);
+		int pooled_h_end = ceil(static_cast<float>(feat_h_th - roi_h_start + 1) / stride_h);
+
+		pooled_w_start = MIN(MAX(pooled_w_start, 0), pooled_w);
+		pooled_h_start = MIN(MAX(pooled_h_start, 0), pooled_h);
+		pooled_w_end = MIN(MAX(pooled_w_end, 0), pooled_w);
+		pooled_h_end = MIN(MAX(pooled_h_end, 0), pooled_h);
+
+		// for each pooled feature, check if it's the same as current feat
+		for (int h_i = pooled_h_start; h_i < pooled_h_end; ++h_i)
+		{
+			for (int w_j = pooled_w_start; w_j < pooled_w_end; ++w_j)
+			{
+				int id = h_i * pooled_w + w_j + pooled_data_offset;
+				if (max_idx[id] == (feat_h_th * w + feat_w_th))
+				{
+					grad += input_grad[id];
+				}
+			}
+		}
+	}
+	out_grad[idx] = grad;
+}
+'''

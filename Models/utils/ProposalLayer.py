@@ -22,8 +22,22 @@ class ProposalLayer:
         self.min_bbox_size = min_bbox_size
 
     def __call__(self, cls, reg, anchor, img_size, img_scale, phase):
+        '''
+        :param cls: (numpy array) cls output by RPN
+        :param reg: (numpy array) reg output by RPN
+        :param anchor: (xp array) generated in RPN
+        :param img_size: (tuple of ints) array of original image (h, w)
+        :param img_scale: (float) image scaling factor
+                          in data processing section
+        :param phase: (string) either 'train' or 'test'
+        :return: region of interest of shape (N, 4), N rois in total,
+                 the 4 is (x_min, y_min, x_max, y_max)
+        '''
         # cupy compatible TODO Compatibility Not Tested
         xp = cp.get_array_module(anchor)
+        if xp is cp:
+            cls = cp.asarray(cls)
+            reg = cp.asarray(reg)
 
         if phase is 'train':
             n_pre_nms  = self.n_pre_nms_train
