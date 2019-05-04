@@ -7,12 +7,11 @@ from Models.utils.boundingbox import generate_anchor_base, all_anchors
 
 
 class RPN(nn.Module):
-    def __init__(self, RPN, extractor, img_size, img_scale,
+    def __init__(self, extractor, img_size,
                  init_mean=0, init_std=0.01, cp_enable=False):
         super(RPN, self).__init__()
         self.extractor = extractor
         self.img_size = img_size
-        self.img_scale = img_scale
         self.cp_enable = cp_enable
         self.anchor_base = generate_anchor_base(cp_enable=self.cp_enable)
         if extractor is "VGG16":
@@ -27,17 +26,31 @@ class RPN(nn.Module):
         self.ProposalLayer = ProposalLayer(self.extractor)
         self._initialize_params(init_mean, init_std)
 
-    def forward(self, x, img_size, img_scale=1.0, phase='test'):
+    def forward(self, feat, img_size, img_scale=1.0, phase='test'):
+        '''
+        :param feat: (torch.Tensor) feature map output by extractor
+        :param img_size: (tuple of ints) original image size (h, w),
+                         used in proposal layer to clip down rois
+        :param img_scale: (float) image scaling factor during data processing
+        :param phase: (string) either 'train' or 'test',
+                      determine whether anchors should be within image
+        :return:reg (torch.Tensor) regression output by rpn
+                cls (torch.Tensor) classification output by rpn
+                roi_list (numpy ndarray) list of rois output by rpn
+                roi_id (numpy ndarray) list of batch id of corresponding roi
+                anchors (xp ndarray) all anchors on the feature map
+        '''
         # cupy compatible TODO Compatibility Not Tested
         if self.cp_enable:
             xp = cp
         else:
             xp = np
-        bat, _, h, w = x.shape
-        anchors = all_anchors(self.anchor_base, self.feat_receptive_len, h, w, phase=phase)
+        bat, _, h, w = feat.shape
+        anchors = all_anchors(self.anchor_base, self.img_size,
+                              self.feat_receptive_len, h, w, phase=phase)
         num_anchors = anchors[0]
 
-        shared = self.share(x)
+        shared = self.share(feat)
         cls = self.cls(shared)
         cls = cls.permute(0, 2, 3, 1).contiguous().view(bat, h, w, num_anchors, 2)  # shape (B, h, w, n_a, 2)
         cls = F.softmax(cls, dim=4)
@@ -68,7 +81,7 @@ class RPN(nn.Module):
         if xp is cp:
             roi_list = cp.asnumpy(roi_list)
 
-        return reg, cls, roi_list, roi_id, anchors
+        return cls, reg, roi_list, roi_id, anchors
 
     def _initialize_params(self, mean, std):
         self.share[0].weight.data.normal_(mean, std)

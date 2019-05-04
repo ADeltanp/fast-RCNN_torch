@@ -1,18 +1,19 @@
 import torch as t
 import torch.nn as nn
 import numpy as np
+from torchvision import models
 from .utils.roi_pooling.roi_pooling_layer import RoIPooling2D
 
 
 class RCNN(nn.Module):
     def __init__(self,
                  n_class,
-                 roi_size,
+                 init_mean,
+                 init_std,
                  roi_pooled_shape=7,
                  feat_receptive_len=16):
         super(RCNN, self).__init__()
         self.n_class = n_class + 1
-        self.roi_size = roi_size
 
         self.roi_pool = RoIPooling2D(roi_pooled_shape, feat_receptive_len)
         self.fcs = nn.Sequential(  # fc6 & fc7 of original VGG16
@@ -23,6 +24,8 @@ class RCNN(nn.Module):
         )
         self.cls = nn.Linear(4096, self.n_class)
         self.reg = nn.Linear(4096, self.n_class * 4)
+
+        self._init_params(init_mean, init_std)
 
     def forward(self, feat, rois, roi_batch_id):
         '''
@@ -47,3 +50,17 @@ class RCNN(nn.Module):
         cls = self.cls(shared)
         reg = self.reg(shared)
         return cls, reg
+
+    def _init_params(self, mean, std):
+        temp = models.vgg16(pretrained=True).classifier
+        self.fcs[0].weight.data = temp[0].weight.data
+        self.fcs[2].weight.data = temp[2].weight.data
+
+        self.fcs[0].bias.data = temp[0].bias.data
+        self.fcs[2].bias.data = temp[2].bias.data
+
+        self.cls.weight.data.normal_(mean, std)
+        self.reg.weight.data.normal_(mean, std)
+
+        self.cls.bias.data.zero_()
+        self.reg.bias.data.zero_()

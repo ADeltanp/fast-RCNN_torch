@@ -19,7 +19,7 @@ class RoIPooling2D(Function):
         cuda_lib_f = cp.cuda.compile_with_cache(forward_kernel)
         cuda_lib_b = cp.cuda.compile_with_cache(backward_kernel)
         self.forward_fn = cuda_lib_f.get_function('roi_forward')
-        self.backward_fn = cuda_lib_f.get_function('roi_backward')
+        self.backward_fn = cuda_lib_b.get_function('roi_backward')
         super(RoIPooling2D, self).__init__()
 
     def forward(ctx, features, rois):
@@ -28,7 +28,8 @@ class RoIPooling2D(Function):
         :param rois: (torch.Tensor) roi array of shape (N, 5),
                      where N = batch_size * roi_size_per_image,
                      5 dims are (batch_index, x_min, y_min, x_max, y_max)
-        :return: (torch.Tensor) feature map after roi pooling
+        :return: (torch.Tensor) feature map after roi pooling,
+                                of shape (batches * rois_per_bat, C, H, W)
         '''
 
         # must be continuous as we use pointer in C later

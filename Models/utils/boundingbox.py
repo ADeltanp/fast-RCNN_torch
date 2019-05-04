@@ -35,7 +35,7 @@ def generate_anchor_base(base_size=16,
     return anchor
 
 
-def all_anchors(anchor_base, feat_receptive_len, h, w, phase='test'):
+def all_anchors(anchor_base, img_size, feat_receptive_len, h, w, phase='test'):
     # cupy compatible TODO Compatibility Not Tested
     xp = cp.get_array_module(anchor_base)
     x = xp.arange(0, w * feat_receptive_len, feat_receptive_len)
@@ -53,8 +53,8 @@ def all_anchors(anchor_base, feat_receptive_len, h, w, phase='test'):
         valid_index = xp.where(
             (anchors[:, 0] >= 0) &
             (anchors[:, 1] >= 0) &
-            (anchors[:, 2] <= 800) &
-            (anchors[:, 3] <= 800)
+            (anchors[:, 2] <= img_size[1]) &
+            (anchors[:, 3] <= img_size[0])
         )
         anchors = anchors[valid_index, :]
     return anchors
