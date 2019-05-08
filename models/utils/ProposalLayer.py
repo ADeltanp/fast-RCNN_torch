@@ -1,6 +1,6 @@
 import cupy as cp
-from Models.utils.boundingbox import t_encoded2bbox
-from Models.utils.nms.non_maximum_suppression import non_maximum_suppression as NMS
+from models.utils.boundingbox import t_encoded2bbox
+from models.utils.nms.non_maximum_suppression import non_maximum_suppression as NMS
 
 
 class ProposalLayer:

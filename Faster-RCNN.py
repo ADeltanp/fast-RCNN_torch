@@ -1,10 +1,10 @@
 import torch as t
 import torch.nn as nn
-from Models.VGG16 import VGG16
-from Models.RPN import RPN
-from Models.RCNN import RCNN
-from Models.utils.ProposalTargetLayer import ProposalTargetLayer
-from Models.utils.AnchorTargetLayer import AnchorTargetLayer
+from models.VGG16 import VGG16
+from models.RPN import RPN
+from models.RCNN import RCNN
+from models.utils.ProposalTargetLayer import ProposalTargetLayer
+from models.utils.AnchorTargetLayer import AnchorTargetLayer
 
 
 class Faster_RCNN(nn.Module):
@@ -16,8 +16,6 @@ class Faster_RCNN(nn.Module):
         self.RPN = RPN('VGG16', img_size)
         self.RCNN = RCNN(n_class, init_mean=0, init_std=0.01)
 
-        self.ProposalTargetLayer = ProposalTargetLayer
-        self.AnchorTargetLayer = AnchorTargetLayer
         super(Faster_RCNN, self).__init__()
 
     def forward(self, img, img_size, img_scale, phase):

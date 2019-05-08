@@ -1,6 +1,6 @@
 import torch as t
 import torch.nn as nn
-from Models.VGG16 import VGG16 as vgg
+from models.VGG16 import VGG16 as vgg
 
 
 class Fast_RCNN(nn.Module):

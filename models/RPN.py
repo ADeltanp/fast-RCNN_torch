@@ -2,8 +2,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import cupy as cp
-from Models.utils.ProposalLayer import ProposalLayer
-from Models.utils.boundingbox import generate_anchor_base, all_anchors
+from models.utils.ProposalLayer import ProposalLayer
+from models.utils.boundingbox import generate_anchor_base, all_anchors
 
 
 class RPN(nn.Module):
