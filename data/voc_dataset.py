@@ -43,6 +43,7 @@ class VOC_detection:
         root = ET.parse(annotation_file)
         bbox = list()
         label = list()
+
         for obj in root.findall("object"):
             if int(obj.find("difficult").text) == 1:
                 continue
