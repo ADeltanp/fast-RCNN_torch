@@ -49,7 +49,7 @@ class RCNN(nn.Module):
         shared = self.fcs(pooled_feat)
         cls = self.cls(shared)
         reg = self.reg(shared)
-        return cls, reg
+        return reg, cls
 
     def _init_params(self, mean, std):
         temp = models.vgg16(pretrained=True).classifier

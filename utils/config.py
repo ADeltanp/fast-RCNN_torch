@@ -13,6 +13,7 @@ class Config:
     lr = 1e-3
 
     data = "voc"
+    n_class = 20
 
     epoch = 14
 

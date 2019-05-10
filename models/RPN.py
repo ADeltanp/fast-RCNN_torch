@@ -7,13 +7,15 @@ from models.utils.boundingbox import generate_anchor_base, all_anchors
 
 
 class RPN(nn.Module):
-    def __init__(self, extractor, img_size,
+    def __init__(self, extractor,
+                 anchor_ratio=[0.5, 1, 2], anchor_scale=[8, 16, 32],
                  init_mean=0, init_std=0.01, cp_enable=False):
         super(RPN, self).__init__()
         self.extractor = extractor
-        self.img_size = img_size
         self.cp_enable = cp_enable
-        self.anchor_base = generate_anchor_base(cp_enable=self.cp_enable)
+        self.anchor_base = generate_anchor_base(scale=anchor_scale,
+                                                ratio=anchor_ratio,
+                                                cp_enable=self.cp_enable)
         if extractor is "VGG16":
             self.feat_receptive_len = 16
 
@@ -26,7 +28,7 @@ class RPN(nn.Module):
         self.ProposalLayer = ProposalLayer(self.extractor)
         self._initialize_params(init_mean, init_std)
 
-    def forward(self, feat, img_size, img_scale=1.0, phase='test'):
+    def forward(self, feat, img_size, img_scale=1.0, phase='train'):
         '''
         :param feat: (torch.Tensor) feature map output by extractor
         :param img_size: (tuple of ints) original image size (h, w),
