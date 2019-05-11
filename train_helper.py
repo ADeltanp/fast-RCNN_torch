@@ -34,7 +34,7 @@ class TrainHelper(nn.Module):
         self.optimizer = self.faster_rcnn.get_optimizer()
 
         self.rpn_cm = ConfusionMeter(2)
-        self.roi_cm = ConfusionMeter(config.n_class + 1)
+        self.rcnn_cm = ConfusionMeter(config.n_class + 1)
         self.meters = {k: AverageValueMeter() for k in LossTuple._fields}
 
     def forward(self, img, bbox, label, scale):
@@ -78,7 +78,7 @@ class TrainHelper(nn.Module):
 
         # RCNN returns (B * roi_per_image, n_class \and\ n_class * 4), torch.Tensor,
         # where B is 1 as only supports batch size of 1
-        roi_cls, roi_reg = self.faster_rcnn.RCNN(feat, sample_roi, sample_roi_idx)
+        rcnn_cls, rcnn_reg = self.faster_rcnn.RCNN(feat, sample_roi, sample_roi_idx)
 
         # ------------------ RPN losses
         # label identifies whether the rpn output is valid or not
@@ -98,15 +98,37 @@ class TrainHelper(nn.Module):
             self.rpn_sigma
         )
         rpn_cls_loss = F.cross_entropy(rpn_cls, gt_rpn_label, ignore_index=-1)
-        gt_rpn_valid_label = gt_rpn_label[gt_rpn_label > -1]
-        rpn_valid_cls = converter.to_numpy(rpn_cls)[converter.to_numpy(gt_rpn_label) > -1]
-        self.rpn_cm.add(converter.to_tensor(rpn_valid_cls, False), gt_rpn_valid_label)
+        gt_rpn_valid_label = gt_rpn_label[gt_rpn_label > -1].cpu()
+        rpn_valid_cls = rpn_cls[gt_rpn_label > -1].cpu()
+        self.rpn_cm.add(converter.to_tensor(rpn_valid_cls, False),
+                        gt_rpn_valid_label.data.long())
 
         # ------------------ roi losses (RCNN losses)
-        n_sample = roi_cls.shape[0]
-        roi_reg = roi_reg.view(n_sample, -1, 4)  # (roi_per_image, n_class, 4)
-        sample_roi_reg = roi_reg[t.arange(0, n_sample).long().cuda(),
-                                 converter.to_tensor(gt_roi_label).long()]
+        n_sample = rcnn_cls.shape[0]
+        rcnn_reg = rcnn_reg.view(n_sample, -1, 4)  # (roi_per_image, n_class, 4)
+        # as RCNN is fed with output of proposal target layer(PTL),
+        # use gt_roi_label, output of PTL, to choose the bbox assoc. with gt bbox
+        # (n_sample, 4)
+        sample_rcnn_reg = rcnn_reg[t.arange(0, n_sample).long().cuda(),
+                                   converter.to_tensor(gt_roi_label).long()]
+        # it doesn't matter to give it another name as they share the same memory
+        gt_rcnn_label = converter.to_tensor(gt_roi_label).long()
+        gt_rcnn_reg = converter.to_tensor(gt_roi_reg)
+
+        rcnn_reg_loss = _fast_rcnn_reg_loss(
+            sample_rcnn_reg.continuous(),
+            gt_rcnn_reg,
+            gt_rcnn_label.data,
+            self.roi_sigma
+        )
+        rcnn_cls_loss = nn.CrossEntropyLoss()(rcnn_cls, gt_rcnn_label)
+        self.rcnn_cm.add(converter.to_tensor(rcnn_cls, False),
+                         gt_rcnn_label.data.long())
+
+        losses = [rpn_cls_loss, rpn_reg_loss, rcnn_cls_loss, rcnn_reg_loss]
+        losses = losses + [sum(losses)]
+
+        return LossTuple(*losses)
 
 
 def _smooth_l1_loss(pred_t, gt_t, in_weight, sigma):
