@@ -30,7 +30,7 @@ class RPN(nn.Module):
 
     def forward(self, feat, img_size, img_scale=1.0, phase='train'):
         '''
-        :param feat: (torch.Tensor) feature map output by extractor
+        :param feat: (torch.Tensor) feature map output by extractor (B, C, f_h, f_w)
         :param img_size: (tuple of ints) original image size (h, w),
                          used in proposal layer to clip down rois
         :param img_scale: (float) image scaling factor during data processing
@@ -56,7 +56,7 @@ class RPN(nn.Module):
         cls = self.cls(shared)
         cls = cls.permute(0, 2, 3, 1).contiguous().view(bat, h, w, num_anchors, 2)  # shape (B, h, w, n_a, 2)
         cls = F.softmax(cls, dim=4)
-        cls = cls.view(bat, -1, 2)
+        cls = cls.view(bat, -1, 2)  # (B, h * w * n_a, 2)
 
         reg = self.reg(shared)
         reg = reg.permute(0, 2, 3, 1).contiguous().view(bat, -1, 4)  # shape (B, h * w * n_a, 4)
@@ -83,6 +83,9 @@ class RPN(nn.Module):
         if xp is cp:
             roi_list = cp.asnumpy(roi_list)
 
+        # (B, h * w * n_a, 2), (B, h * w * n_a, 4),
+        # (B * N_pos_nms, 4), (B * N_pos_nms, ), (h * w * n_a, 4)
+        # only support batch size 1 b/c feat.shape must be constant over one forward
         return cls, reg, roi_list, roi_id, anchors
 
     def _initialize_params(self, mean, std):

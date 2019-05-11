@@ -31,17 +31,17 @@ class ProposalTargetLayer:
 
         n_positives = xp.round(self.positive_ratio * self.n_sample)
         iou = compute_iou(roi, gt_bbox)  # shape (N, K), N roi, K gt
-        max_gt_iou_id = iou.argmax(axis=1)  # shape(N, ), gt id of max iou with each roi resp.
-        max_gt_iou = iou.max(axis=1)  # get the max iou of each roi resp.
-        roi_label = gt_label[max_gt_iou_id] + 1  # assign gt label to roi, 0 reserved for bg
+        max_iou_gt_id = iou.argmax(axis=1)  # shape(N, ), gt id of max iou with each roi resp.
+        max_iou = iou.max(axis=1)  # (N, ) get the max iou of each roi resp.
+        roi_label = gt_label[max_iou_gt_id] + 1  # assign gt label to roi, 0 reserved for bg
 
-        positive_id = xp.where(max_gt_iou >= self.positive_iou_thresh)[0]
+        positive_id = xp.where(max_iou >= self.positive_iou_thresh)[0]
         positives = int(min(n_positives, len(positive_id)))
         if len(positive_id) > 0:
             positive_id = xp.random.choice(positive_id, size=positives, replace=False)
 
-        negative_id = xp.where((max_gt_iou < self.negative_iou_thresh_hi) &
-                               (max_gt_iou >= self.negative_iou_thresh_lo))[0]
+        negative_id = xp.where((max_iou < self.negative_iou_thresh_hi) &
+                               (max_iou >= self.negative_iou_thresh_lo))[0]
         negatives = self.n_sample - positives
         negatives = int(min(negatives, len(negative_id)))
         if len(negative_id) > 0:
@@ -52,11 +52,15 @@ class ProposalTargetLayer:
         roi_label[positives:] = 0
         sample_roi = roi[keep]  # hence sample_roi[i]'s label is roi_label[i]
 
-        # max_gt_iou_id[keep] is sorted id of [pos:neg],
+        # max_iou_gt_id[keep] is sorted id of [pos:neg],
         # thus gt_bbox[...] is corresponding bbox of sample
-        roi_gt_t = bbox2t_encoded(sample_roi, gt_bbox[max_gt_iou_id[keep]])
+        # here we compute t_star of the original paper
+        roi_gt_t = bbox2t_encoded(sample_roi, gt_bbox[max_iou_gt_id[keep]])
         roi_gt_t = ((roi_gt_t - xp.array(t_normalize_mean, xp.float32)) /
                     xp.array(t_normalize_std, xp.float32))
 
         # roi not encoded, roi_t encoded, all are (x, y, h, w)
+        # (n_pos + n_neg, 4 \and\ 4 \and\ (NA)), xp.ndarray
+        # reminds that label here is ACTUAL target label, from 0 to n_class,
+        # rather than that 'label' used in anchor target layer to denote the validity
         return sample_roi, roi_gt_t, roi_label

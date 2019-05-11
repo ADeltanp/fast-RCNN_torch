@@ -17,9 +17,10 @@ class AnchorTargetLayer:
         max_iou_id, labels = self._label(anchor, gt_bbox)
 
         t_star = bbox2t_encoded(anchor, gt_bbox[max_iou_id, :])
-        return t_star, labels
+        return t_star, labels  # (N, 4), (N, ), xp.ndarray
 
     def _label(self, anchor, gt_bbox):
+        # label: invalid -> -1; negative -> 0; positive -> 1
         # cupy compatible TODO Compatibility Not Tested
         xp = cp.get_array_module(anchor)
         labels = xp.empty((len(anchor),), dtype=xp.int32)  # shape (N, )
@@ -47,19 +48,24 @@ class AnchorTargetLayer:
                                           replace=False)
             labels[discard_id] = -1
 
-        return max_iou_id, labels
+        return max_iou_id, labels  # (N, ), (N, ), xp.ndarray
 
     def _ious(self, anchor, gt_bbox):
         # cupy compatible TODO Compatibility Not Tested
         xp = cp.get_array_module(anchor)
         ious = compute_iou(anchor, gt_bbox)  # shape (N, K), N anchors, K gt
 
-        # axis 0 is the max anchor of every gt_bbox, axis 1 is gt_bbox of every anchor
-        max_iou_id = ious.argmax(axis=1)  # shape (N, )
-        gt_max_iou_id = ious.argmax(axis=0)  # shape (K, )
+        # axis 0 gets the max anchor of every gt_bbox, axis 1 gets gt_bbox of every anchor
+        max_iou_id = ious.argmax(axis=1)  # shape (N, ), assign N anchor with gt id
+        gt_max_iou_id = ious.argmax(axis=0)  # shape (K, ), assign K gt with anchor id
 
-        max_iou = ious[xp.arange(len(anchor)), max_iou_id]  # shape (N, ), max iou of each anchor
-        gt_max_iou = ious[gt_max_iou_id, xp.arange(ious.shape[1])]  # shape (K, ), max of each gt
-        gt_max_iou_id = xp.where(ious == gt_max_iou[:, xp.newaxis])[0]  # retrieve which anchor has max iou with gt
+        # shape (N, ), max iou of each anchor (max within row, not id but data
+        anchor_max_iou = ious[xp.arange(ious.shape[0]), max_iou_id]
+        # shape (K, ), max iou of each gt (max within column, not id but data)
+        gt_max_iou = ious[gt_max_iou_id, xp.arange(ious.shape[1])]
+        # retrieve which anchor has max iou with gt, (N, K) == (K, ),
+        # as only the top K anchors have identical iou with one of gt_max_iou,
+        # hence output of shape (K, )
+        gt_max_iou_id = xp.where(ious == gt_max_iou)[0]  # (K, )
 
-        return max_iou_id, max_iou, gt_max_iou_id
+        return max_iou_id, anchor_max_iou, gt_max_iou_id  # (N, ), (K, ), (K, ), xp.ndarray

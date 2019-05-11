@@ -37,6 +37,8 @@ def generate_anchor_base(base_size=16,
 
 def all_anchors(anchor_base, img_size, feat_receptive_len, h, w, phase='test'):
     # cupy compatible TODO Compatibility Not Tested
+    assert anchor_base.shape[1] == 4
+
     xp = cp.get_array_module(anchor_base)
     x = xp.arange(0, w * feat_receptive_len, feat_receptive_len)
     y = xp.arange(0, h * feat_receptive_len, feat_receptive_len)
@@ -50,6 +52,7 @@ def all_anchors(anchor_base, img_size, feat_receptive_len, h, w, phase='test'):
     anchors = anchor_base[xp.newaxis, :] + ctr_shift[xp.newaxis, :].transpose((1, 0, 2))
     anchors = anchors.reshape((num_base * num_shift, 4)).astype(xp.float32)
     if phase is 'train':
+        assert len(img_size) == 2
         valid_index = xp.where(
             (anchors[:, 0] >= 0) &
             (anchors[:, 1] >= 0) &
@@ -74,11 +77,15 @@ def t_encoded2bbox(anchor, t_encoded):
 
     N is the number of anchors in total
     w_a, h_a, x_a, y_a, t_x, t_y, t_w, t_h are the notations used in the original paper
-    tgt_x, tgt_y, tgt_w, tgt_h stands for x, y, w, h in the original paper respectively
+    tgt_* stands for * or *_star in the original paper resp.
     x_a and y_a, tgt_x and tgt_y are coordinates of the according center
 
     the function following is the reverse of this one
     '''
+    assert anchor.shape[0] == t_encoded.shape[0]
+    assert anchor.shape[1] == 4
+    assert t_encoded.shape[1] == 4
+
     xp = cp.get_array_module(anchor)
 
     if anchor[0] == 0:
@@ -112,6 +119,10 @@ def bbox2t_encoded(anchor, target_bbox):
 
     anchor and target_bbox must both be either numpy or cupy objects
     '''
+    assert anchor.shape[0] == target_bbox.shape[0]
+    assert anchor.shape[1] == 4
+    assert target_bbox.shape[1] == 4
+
     xp = cp.get_array_module(anchor)
 
     w_a = anchor[:, 2] - anchor[:, 0]

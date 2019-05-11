@@ -2,7 +2,7 @@ import os
 import torch as t
 import torch.nn as nn
 import utils.converter as converter
-
+from torch.nn import functional as F
 from collections import namedtuple
 from torchnet.meter import ConfusionMeter, AverageValueMeter
 from utils.config import config
@@ -54,7 +54,10 @@ class TrainHelper(nn.Module):
         img_size = (h, w)
 
         feat = self.faster_rcnn.extractor(img)
-        rpn_reg, rpn_cls, rois, roi_id, anchor = self.faster_rcnn.RPN(feat, img_size, scale)
+
+        # RPN returns (B, f_h * f_w * n_a, 2), (B, f_h * f_w * n_a, 4),
+        # (N_pos_nms, 4), (N_p_n, 4), (f_h * f_w * n_a, 4)
+        rpn_cls, rpn_reg, rois, roi_id, anchor = self.faster_rcnn.RPN(feat, img_size, scale)
 
         bbox = bbox[0]
         label = label[0]
@@ -62,6 +65,8 @@ class TrainHelper(nn.Module):
         rpn_reg = rpn_reg[0]
         roi = rois
 
+        # proposal target layer returns (n_pos + n_neg, 4 \and\ 4 \and\ (NA)), xp.ndarray
+        # label here is actual target label(gt label), not denote of validity
         sample_roi, gt_roi_reg, gt_roi_label = self.proposal_target_layer(
             roi,
             converter.to_numpy(bbox),
@@ -69,17 +74,40 @@ class TrainHelper(nn.Module):
             self.reg_normalize_mean,
             self.reg_normalize_std
         )
-        sample_roi_idx = t.zeros(len(sample_roi))
-        roi_reg, roi_cls = self.faster_rcnn.RCNN(feat, sample_roi, sample_roi_idx)
+        sample_roi_idx = t.zeros(len(sample_roi))  # all samples are batch 0
 
-        # RPN losses
+        # RCNN returns (B * roi_per_image, n_class \and\ n_class * 4), torch.Tensor,
+        # where B is 1 as only supports batch size of 1
+        roi_cls, roi_reg = self.faster_rcnn.RCNN(feat, sample_roi, sample_roi_idx)
+
+        # ------------------ RPN losses
+        # label identifies whether the rpn output is valid or not
+        # label: invalid -> -1; negative(bg) -> 0; positive(fg) -> 1
+        # anchor target layer returns (N, 4), (N, ), xp.ndarray
+        # where gt_rpn_reg is the id of gt assigned to that proposal
         gt_rpn_reg, gt_rpn_label = self.anchor_target_layer(
             converter.to_numpy(bbox),
             anchor,
         )
-        gt_rpn_label = converter.to_tensor(gt_rpn_label).long()
-        gt_rpn_reg = converter.to_tensor(gt_roi_reg)
-        rpn_reg_loss = # TODO
+        gt_rpn_label = converter.to_tensor(gt_rpn_label).long()  # already on cuda
+        gt_rpn_reg = converter.to_tensor(gt_roi_reg)  # already on cuda
+        rpn_reg_loss = _fast_rcnn_reg_loss(
+            rpn_reg,
+            gt_rpn_reg,
+            gt_rpn_label.data,
+            self.rpn_sigma
+        )
+        rpn_cls_loss = F.cross_entropy(rpn_cls, gt_rpn_label, ignore_index=-1)
+        gt_rpn_valid_label = gt_rpn_label[gt_rpn_label > -1]
+        rpn_valid_cls = converter.to_numpy(rpn_cls)[converter.to_numpy(gt_rpn_label) > -1]
+        self.rpn_cm.add(converter.to_tensor(rpn_valid_cls, False), gt_rpn_valid_label)
+
+        # ------------------ roi losses (RCNN losses)
+        n_sample = roi_cls.shape[0]
+        roi_reg = roi_reg.view(n_sample, -1, 4)  # (roi_per_image, n_class, 4)
+        sample_roi_reg = roi_reg[t.arange(0, n_sample).long().cuda(),
+                                 converter.to_tensor(gt_roi_label).long()]
+
 
 def _smooth_l1_loss(pred_t, gt_t, in_weight, sigma):
     sigma2 = sigma ** 2
@@ -88,6 +116,7 @@ def _smooth_l1_loss(pred_t, gt_t, in_weight, sigma):
     flag = (abs_diff.data < (1.0 / sigma2)).float()
     y = (flag * (sigma2 / 2.0) * (diff ** 2) + (1 - flag) * (abs_diff - 0.5 / sigma2))
     return y.sum()
+
 
 def _fast_rcnn_reg_loss(pred_reg, gt_reg, gt_label, sigma):
     in_weight = t.zeros(gt_reg.shape).cuda()
