@@ -6,6 +6,13 @@ from models.RCNN import RCNN
 from utils.config import config
 
 
+def nograd(f):
+    def new_f(*args,**kwargs):
+        with t.no_grad():
+           return f(*args,**kwargs)
+    return new_f
+
+
 class Faster_RCNN(nn.Module):
     def __init__(self, n_class=20,
                  extractor_pretrained=True,
@@ -30,6 +37,14 @@ class Faster_RCNN(nn.Module):
         rpn_cls, rpn_reg, roi_list, roi_id, anchors = self.RPN(feat, img_size, img_scale)
         cls, reg = self.RCNN(feat, roi_list, roi_id)
         return cls, reg, roi_list, roi_id
+
+    @nograd
+    def predict(self, img, size=None):
+        self.eval()
+        bbox = list()
+        label = list()
+        cls = list()
+        for img, size in zip(img, size):
 
     def get_optimizer(self):
         lr = config.lr

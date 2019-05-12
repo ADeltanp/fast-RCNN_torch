@@ -21,6 +21,8 @@ class Config:
 
     test_num = 10000
 
+    load_path = None
+
     # using inputs to change default config
     def _parse(self, kwargs):
         self_dict = self._dict()
@@ -29,7 +31,7 @@ class Config:
                 raise ValueError("No option named \"--%s\"" % k)
             setattr(self, k, v)
 
-    def _dict(self):
+    def _state_dict(self):
         return {k : getattr(self, k) for k, _ in Config.__dict__.items()
                 if not k.stratwith("_")}
 

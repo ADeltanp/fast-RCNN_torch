@@ -1,4 +1,4 @@
-import os
+import os, time
 import torch as t
 import torch.nn as nn
 import utils.converter as converter
@@ -47,8 +47,7 @@ class TrainHelper(nn.Module):
         :return: namedtuple of 5 losses
         '''
         n = bbox.shape[0]
-        if n != 1:
-            raise ValueError('Only support batch size of 1')
+        assert n == 1, 'currently only support batch size of 1'
 
         _, _, h, w = img.shape
         img_size = (h, w)
@@ -129,6 +128,60 @@ class TrainHelper(nn.Module):
         losses = losses + [sum(losses)]
 
         return LossTuple(*losses)
+
+    def train_step(self, img, bbox, label, scale):
+        self.optimizer.zero_grad()
+        losses = self.forward(img, bbox, label, scale)
+        losses.total_loss.backward()
+        self.optimizer.step()
+        self.update_meters(losses)
+        return losses
+
+    def save(self, save_optimizer=False, save_path=None, **kwargs):
+        save_dict = dict()
+        save_dict['model'] = self.faster_rcnn.state_dict()
+        save_dict['config'] = config._state_dict()
+        save_dict['miscellaneous'] = kwargs
+        if save_optimizer:
+            save_dict['optimizer'] = self.optimizer.state_dict()
+
+        if save_path is None:
+            time_ = time.strftime('%y%m%d%H%M')
+            save_path = 'checkpoints/faster_rcnn_%s' % time_
+            for k, v in kwargs.items():
+                save_path += '_%s' % v
+
+        save_dir = os.path.dirname(save_path)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        t.save(save_dict, save_path)
+        return save_path
+
+    def load(self, path, load_optimizer=True, parse_config=False):
+        state_dict = t.load(path)
+        if 'model' in state_dict:
+            self.faster_rcnn.load_state_dict(state_dict['model'])
+        else:
+            self.faster_rcnn.load_state_dict(state_dict)
+        if parse_config:
+            config._parse(state_dict['config'])
+        if 'optimizer' in state_dict and load_optimizer:
+            self.optimizer.load_state_dict(state_dict['optimizer'])
+        return self
+
+    def update_meters(self, losses):
+        loss_dict = {k: converter.to_tensor(v) for k, v in losses._asdict().items()}
+        for key, meter in self.meters.items():
+            meter.add(loss_dict[key])
+
+    def reset_meters(self):
+        for key, meter in self.meters.items():
+            meter.reset()
+        self.rcnn_cm.reset()
+        self.rpn_cm.reset()
+
+    def get_meter_data(self):
+        return {k: v.value()[0] for k, v in self.meters.items()}
 
 
 def _smooth_l1_loss(pred_t, gt_t, in_weight, sigma):
