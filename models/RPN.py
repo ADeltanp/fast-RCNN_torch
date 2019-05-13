@@ -83,8 +83,7 @@ class RPN(nn.Module):
         if xp is cp:
             roi_list = cp.asnumpy(roi_list)
 
-        # (B, h * w * n_a, 2), (B, h * w * n_a, 4),
-        # (B * N_pos_nms, 4), (B * N_pos_nms, ), (h * w * n_a, 4)
+        # (B, h * w * n_a, 2 \and\ 4), (B * N_pos_nms, 4 \and\ (NA)), (h * w * n_a, 4)
         # only support batch size 1 b/c feat.shape must be constant over one forward
         return cls, reg, roi_list, roi_id, anchors
 

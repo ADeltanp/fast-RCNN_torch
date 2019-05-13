@@ -1,5 +1,6 @@
 class Config:
-    voc_data_dir = ""
+    extractor = 'VGG16'
+    voc_data_dir = ''
     min_size = 600
     max_size = 1000
     num_workers = 8
@@ -12,7 +13,7 @@ class Config:
     lr_decay = 0.1
     lr = 1e-3
 
-    data = "voc"
+    data = 'voc'
     n_class = 20
 
     epoch = 14
@@ -28,7 +29,7 @@ class Config:
         self_dict = self._dict()
         for k, v in kwargs.items():
             if k not in self_dict:
-                raise ValueError("No option named \"--%s\"" % k)
+                raise ValueError('No option named \"--%s\"' % k)
             setattr(self, k, v)
 
     def _state_dict(self):

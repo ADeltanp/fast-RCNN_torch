@@ -49,7 +49,7 @@ def non_maximum_suppression(bbox, thresh, score=None,
     The type of the output is the same as the input.
 
     Args:
-        bbox (array): Bounding boxes to be transformed. The shape is
+        bbox (ndarray): Bounding boxes to be transformed. The shape is
             :math:`(R, 4)`. :math:`R` is the number of bounding boxes.
         thresh (float): Threshold of IoUs.
         score (array): An array of confidences whose shape is :math:`(R,)`.

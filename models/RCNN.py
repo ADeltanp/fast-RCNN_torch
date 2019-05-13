@@ -49,7 +49,7 @@ class RCNN(nn.Module):
         shared = self.fcs(pooled_feat)
         cls = self.cls(shared)
         reg = self.reg(shared)
-        return cls, reg  # (B * roi_per_image, n_class; n_class * 4), torch.Tensor
+        return cls, reg  # (B * roi_per_image, n_class \and\ n_class * 4), torch.Tensor
 
     def _init_params(self, mean, std):
         temp = models.vgg16(pretrained=True).classifier

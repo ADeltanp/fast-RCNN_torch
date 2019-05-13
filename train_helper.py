@@ -46,8 +46,7 @@ class TrainHelper(nn.Module):
         :param scale: (float) scale factor during preprocess
         :return: namedtuple of 5 losses
         '''
-        n = bbox.shape[0]
-        assert n == 1, 'currently only support batch size of 1'
+        assert bbox.shape[0] == 1, 'currently only support batch size of 1.'
 
         _, _, h, w = img.shape
         img_size = (h, w)
@@ -55,7 +54,7 @@ class TrainHelper(nn.Module):
         feat = self.faster_rcnn.extractor(img)
 
         # RPN returns (B, f_h * f_w * n_a, 2), (B, f_h * f_w * n_a, 4),
-        # (N_pos_nms, 4), (N_p_n, 4), (f_h * f_w * n_a, 4)
+        # (N_pos_nms, 4), (N_p_n, 4), (f_h * f_w * n_a, 4), N_pos_nms = roi_per_img
         rpn_cls, rpn_reg, rois, roi_id, anchor = self.faster_rcnn.RPN(feat, img_size, scale)
 
         bbox = bbox[0]
@@ -80,8 +79,10 @@ class TrainHelper(nn.Module):
         rcnn_cls, rcnn_reg = self.faster_rcnn.RCNN(feat, sample_roi, sample_roi_idx)
 
         # ------------------ RPN losses
+        #
         # label identifies whether the rpn output is valid or not
         # label: invalid -> -1; negative(bg) -> 0; positive(fg) -> 1
+        #
         # anchor target layer returns (N, 4), (N, ), xp.ndarray
         # where gt_rpn_reg is the id of gt assigned to that proposal
         gt_rpn_reg, gt_rpn_label = self.anchor_target_layer(
@@ -105,6 +106,7 @@ class TrainHelper(nn.Module):
         # ------------------ roi losses (RCNN losses)
         n_sample = rcnn_cls.shape[0]
         rcnn_reg = rcnn_reg.view(n_sample, -1, 4)  # (roi_per_image, n_class, 4)
+
         # as RCNN is fed with output of proposal target layer(PTL),
         # use gt_roi_label, output of PTL, to choose the bbox assoc. with gt bbox
         # (n_sample, 4)

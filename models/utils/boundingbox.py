@@ -1,5 +1,6 @@
 import numpy as np
 import cupy as cp
+import torch as t
 
 
 def generate_anchor_base(base_size=16,
@@ -65,7 +66,7 @@ def all_anchors(anchor_base, img_size, feat_receptive_len, h, w, phase='test'):
 
 def t_encoded2bbox(anchor, t_encoded):
     '''
-    cupy compatible TODO Compatibility Not Tested
+    torch, cupy compatible TODO Compatibility Not Tested
     decode t_x, t_y, t_h, t_w to bounding box, x_min, x_max, y_min, y_max
 
     anchor[i, :] = x_a_min, y_a_min, x_a_max, y_a_max, offset of i th anchor
@@ -85,11 +86,17 @@ def t_encoded2bbox(anchor, t_encoded):
     assert anchor.shape[0] == t_encoded.shape[0]
     assert anchor.shape[1] == 4
     assert t_encoded.shape[1] == 4
+    assert isinstance(anchor, type(t_encoded))
 
-    xp = cp.get_array_module(anchor)
+    if isinstance(anchor, t.Tensor):
+        txp = t
+    elif type(anchor) in (cp.ndarray, np.ndarray):
+        txp = cp.get_array_module(anchor)
+    else:
+        raise TypeError('only accept torch.Tensor, cp.ndarray or np.ndarray.')
 
     if anchor[0] == 0:
-        return xp.zeros((0, 4), dtype=t_encoded.dtype)
+        return txp.zeros((0, 4), dtype=t_encoded.dtype)
 
     w_a = anchor[:, 2] - anchor[:, 0]  # shape (N, )
     h_a = anchor[:, 3] - anchor[:, 1]  # shape (N, )
@@ -103,49 +110,60 @@ def t_encoded2bbox(anchor, t_encoded):
 
     tgt_x = t_x * w_a + x_a    # shape (N, )
     tgt_y = t_y * h_a + y_a    # shape (N, )
-    tgt_h = xp.exp(t_h) * h_a  # shape (N, )
-    tgt_w = xp.exp(t_w) * w_a  # shape (N, )
+    tgt_h = txp.exp(t_h) * h_a  # shape (N, )
+    tgt_w = txp.exp(t_w) * w_a  # shape (N, )
 
-    target_bbox = xp.vstack((tgt_x, tgt_y, tgt_h, tgt_w)).transpose()
+    # stacked (4, N) -> transpose(N, 4)
+    target_bbox = txp.stack((tgt_x, tgt_y, tgt_h, tgt_w)).transpose(1, 0)
     return target_bbox
 
 
 def bbox2t_encoded(anchor, target_bbox):
     '''
-    cupy compatible TODO Compatibility Not Tested
+    torch, cupy compatible TODO Compatibility Not Tested
     :param anchor: anchors over image of shape (N, 4)
     :param target_bbox: bbox over image of shape (N, 4)
     :return: encoded offsets (denoted by t in the paper) of shape (N, 4)
 
-    anchor and target_bbox must both be either numpy or cupy objects
+    anchor and target_bbox must both be either t.Tensor, np.ndarray or cp.ndarray
     '''
     assert anchor.shape[0] == target_bbox.shape[0]
     assert anchor.shape[1] == 4
     assert target_bbox.shape[1] == 4
+    assert isinstance(anchor, type(target_bbox))
 
-    xp = cp.get_array_module(anchor)
+    if isinstance(anchor, t.Tensor):
+        txp = t
+    elif type(anchor) in (cp.ndarray, np.ndarray):
+        txp = cp.get_array_module(anchor)
+    else:
+        raise TypeError('only accept torch.Tensor, cp.ndarray or np.ndarray.')
 
-    w_a = anchor[:, 2] - anchor[:, 0]
+    w_a = anchor[:, 2] - anchor[:, 0]  # (N, )
     h_a = anchor[:, 3] - anchor[:, 1]
     x_a = anchor[:, 0] + 0.5 * w_a
     y_a = anchor[:, 1] + 0.5 * h_a
 
-    tgt_w = target_bbox[:, 2] - target_bbox[:, 0]
+    tgt_w = target_bbox[:, 2] - target_bbox[:, 0]  # (N, )
     tgt_h = target_bbox[:, 3] - target_bbox[:, 1]
     tgt_x = target_bbox[:, 0] + 0.5 * tgt_w
     tgt_y = target_bbox[:, 1] + 0.5 * tgt_h
 
     # ensure not divided by zero
-    eps = xp.finfo(w_a.dtype).eps
-    h_a = xp.maximum(h_a, eps)
-    w_a = xp.maximum(w_a, eps)
+    eps = txp.finfo(w_a.dtype).eps
+    if txp is t:
+        h_a = txp.max(h_a, eps)
+        w_a = txp.max(w_a, eps)
+    else:
+        h_a = txp.maximum(h_a, eps)
+        w_a = txp.maximum(w_a, eps)
 
-    t_x = (tgt_x - x_a) / w_a
+    t_x = (tgt_x - x_a) / w_a  # (N, )
     t_y = (tgt_y - y_a) / h_a
-    t_h = xp.log(tgt_h / h_a)
-    t_w = xp.log(tgt_w / w_a)
+    t_h = txp.log(tgt_h / h_a)
+    t_w = txp.log(tgt_w / w_a)
 
-    t_encoded = xp.vstack((t_x, t_y, t_h, t_w)).transpose()
+    t_encoded = txp.stack((t_x, t_y, t_h, t_w)).transpose(1, 0)
     return t_encoded
 
 
