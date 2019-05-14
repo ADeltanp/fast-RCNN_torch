@@ -1,5 +1,5 @@
 import cupy as cp
-from .boundingbox import compute_iou, bbox2t_encoded
+from .boundingbox import compute_iou_xp, bbox2t_encoded
 
 
 class ProposalTargetLayer:
@@ -30,7 +30,7 @@ class ProposalTargetLayer:
         xp = cp.get_array_module(roi)
 
         n_positives = xp.round(self.positive_ratio * self.n_sample)
-        iou = compute_iou(roi, gt_bbox)  # shape (N, K), N roi, K gt
+        iou = compute_iou_xp(roi, gt_bbox)  # shape (N, K), N roi, K gt
         max_iou_gt_id = iou.argmax(axis=1)  # shape(N, ), gt id of max iou with each roi resp.
         max_iou = iou.max(axis=1)  # (N, ) get the max iou of each roi resp.
         roi_label = gt_label[max_iou_gt_id] + 1  # assign gt label to roi, 0 reserved for bg

@@ -1,5 +1,5 @@
 import cupy as cp
-from .boundingbox import bbox2t_encoded, compute_iou
+from .boundingbox import bbox2t_encoded, compute_iou_xp
 
 
 class AnchorTargetLayer:
@@ -53,7 +53,7 @@ class AnchorTargetLayer:
     def _ious(self, anchor, gt_bbox):
         # cupy compatible TODO Compatibility Not Tested
         xp = cp.get_array_module(anchor)
-        ious = compute_iou(anchor, gt_bbox)  # shape (N, K), N anchors, K gt
+        ious = compute_iou_xp(anchor, gt_bbox)  # shape (N, K), N anchors, K gt
 
         # axis 0 gets the max anchor of every gt_bbox, axis 1 gets gt_bbox of every anchor
         max_iou_id = ious.argmax(axis=1)  # shape (N, ), assign N anchor with gt id

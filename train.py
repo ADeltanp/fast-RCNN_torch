@@ -17,9 +17,18 @@ def eval(testset, faster_rcnn, test_num=10000):
     pred_bbox, pred_label, pred_cls = list(), list(), list()
     gt_bbox, gt_label = list(), list()
 
-    for i, (img, size, gt_bbox, gt_label) in tqdm(enumerate(testset)):
+    for i, (img, size, gt_bbox_, gt_label_) in tqdm(enumerate(testset)):
         size = [size[0][0].item(), size[1][0].item()]
         pred_bbox_, pred_label_, pred_cls_ = faster_rcnn.predict(img, [size])
+        gt_bbox += list(gt_bbox_.numpy())
+        gt_label += list(gt_label_)
+        pred_bbox += pred_bbox_
+        pred_label += pred_label_
+        pred_cls += pred_cls_
+        if i == test_num:
+            break
+
+        result = eval_de
 
 
 def train(**kwargs):

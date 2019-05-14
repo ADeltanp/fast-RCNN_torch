@@ -167,9 +167,13 @@ def bbox2t_encoded(anchor, target_bbox):
     return t_encoded
 
 
-def compute_iou(bbox_a, bbox_b):
+def compute_iou_xp(bbox_a, bbox_b):
     # cupy compatible TODO Compatibility Not Tested
+    # (N, 4), (K, 4)
     # bbox of (x, y, x, y), not (x, y, h, w)
+    assert bbox_a.shape[1] == bbox_b.shape[1]
+    assert type(bbox_a) == type(bbox_b)
+
     xp = cp.get_array_module(bbox_a)
 
     # newaxis here is to utilize broadcasting to compare between each element in a and b
