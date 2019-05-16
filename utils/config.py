@@ -1,6 +1,6 @@
 class Config:
     extractor = 'VGG16'
-    voc_data_dir = ''
+    voc_data_dir = '/media/zhangzh/DATA/RtCV/Data/VOCdevkit/VOC2012'
     min_size = 600
     max_size = 1000
     num_workers = 8
@@ -26,7 +26,7 @@ class Config:
 
     # using inputs to change default config
     def _parse(self, kwargs):
-        self_dict = self._dict()
+        self_dict = self._state_dict()
         for k, v in kwargs.items():
             if k not in self_dict:
                 raise ValueError('No option named \"--%s\"' % k)
@@ -34,7 +34,7 @@ class Config:
 
     def _state_dict(self):
         return {k : getattr(self, k) for k, _ in Config.__dict__.items()
-                if not k.stratwith("_")}
+                if not k.startswith("_")}
 
 
 config = Config()
