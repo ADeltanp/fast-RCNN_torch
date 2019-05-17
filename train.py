@@ -50,7 +50,7 @@ def train(**kwargs):
                                  num_workers=config.test_num_workers,
                                  shuffle=False,
                                  pin_memory=True)
-    faster_rcnn = Faster_RCNN().cuda()
+    faster_rcnn = Faster_RCNN()
     print('constructed Faster-RCNN model')
     train_helper = TrainHelper(faster_rcnn).cuda()
     if config.load_path:

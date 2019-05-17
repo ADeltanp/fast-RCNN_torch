@@ -19,7 +19,7 @@ LossTuple = namedtuple('LossTuple',
 
 class TrainHelper(nn.Module):
     def __init__(self, faster_rcnn):
-        super(TrainHelper, self).__init__()
+        super().__init__()
 
         self.faster_rcnn = faster_rcnn
         self.rpn_sigma = config.rpn_sigma

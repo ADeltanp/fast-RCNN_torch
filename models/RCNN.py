@@ -2,6 +2,7 @@ import torch as t
 import torch.nn as nn
 import numpy as np
 from torchvision import models
+from utils import converter
 from .utils.roi_pooling.roi_pooling_layer import RoIPooling2D
 
 
@@ -12,7 +13,7 @@ class RCNN(nn.Module):
                  init_std,
                  roi_pooled_shape=7,
                  feat_receptive_len=16):
-        super(RCNN, self).__init__()
+        super().__init__()
         self.n_class = n_class + 1
 
         self.roi_pool = RoIPooling2D(roi_pooled_shape, feat_receptive_len)
@@ -37,8 +38,8 @@ class RCNN(nn.Module):
         '''
 
         # not requires grad as no backprop at RPN
-        rois = t.from_numpy(rois)
-        roi_batch_id = t.from_numpy(roi_batch_id[:, np.newaxis])
+        rois = converter.to_tensor(rois)
+        roi_batch_id = converter.to_tensor(roi_batch_id[:, np.newaxis])
         id_rois = t.cat((roi_batch_id, rois), dim=1)
 
         id_rois = id_rois.contiguous()
@@ -54,10 +55,10 @@ class RCNN(nn.Module):
     def _init_params(self, mean, std):
         temp = models.vgg16(pretrained=True).classifier
         self.fcs[0].weight.data = temp[0].weight.data
-        self.fcs[2].weight.data = temp[2].weight.data
+        self.fcs[2].weight.data = temp[3].weight.data
 
         self.fcs[0].bias.data = temp[0].bias.data
-        self.fcs[2].bias.data = temp[2].bias.data
+        self.fcs[2].bias.data = temp[3].bias.data
 
         self.cls.weight.data.normal_(mean, std)
         self.reg.weight.data.normal_(mean, std)

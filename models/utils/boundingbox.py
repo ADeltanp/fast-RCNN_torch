@@ -28,10 +28,10 @@ def generate_anchor_base(base_size=16,
     h = base_size * xp.matmul(scale, xp.sqrt(ratio).transpose()).reshape(-1, 1)
     w = base_size * xp.matmul(scale, xp.sqrt(1 / ratio).transpose()).reshape(-1, 1)
 
-    anchor[:, 0] -= w / 2.0  # x_min of idx th ratio
-    anchor[:, 1] -= h / 2.0  # y_min of idx th ratio
-    anchor[:, 2] += w / 2.0  # x_max of idx th ratio
-    anchor[:, 3] += h / 2.0  # y_max of idx th ratio
+    anchor[:, 0::4] -= w / 2.0  # x_min of idx th ratio
+    anchor[:, 1::4] -= h / 2.0  # y_min of idx th ratio
+    anchor[:, 2::4] += w / 2.0  # x_max of idx th ratio
+    anchor[:, 3::4] += h / 2.0  # y_max of idx th ratio
 
     return anchor
 
@@ -52,6 +52,7 @@ def all_anchors(anchor_base, img_size, feat_receptive_len, h, w, phase='test'):
     # shape (1, 9, 4) + (num_shift, 1, 4) = (num_shift, 9, 4), num_base = 9 by default
     anchors = anchor_base[xp.newaxis, :] + ctr_shift[xp.newaxis, :].transpose((1, 0, 2))
     anchors = anchors.reshape((num_base * num_shift, 4)).astype(xp.float32)
+    valid_index = np.arange(anchors.shape[0])
     if phase is 'train':
         assert len(img_size) == 2
         valid_index = xp.where(
@@ -59,9 +60,10 @@ def all_anchors(anchor_base, img_size, feat_receptive_len, h, w, phase='test'):
             (anchors[:, 1] >= 0) &
             (anchors[:, 2] <= img_size[1]) &
             (anchors[:, 3] <= img_size[0])
-        )
+        )[0]
         anchors = anchors[valid_index, :]
-    return anchors
+
+    return anchors, valid_index
 
 
 def t_encoded2bbox(anchor, t_encoded):
@@ -95,8 +97,8 @@ def t_encoded2bbox(anchor, t_encoded):
     else:
         raise TypeError('only accept torch.Tensor, cp.ndarray or np.ndarray.')
 
-    if anchor[0] == 0:
-        return txp.zeros((0, 4), dtype=t_encoded.dtype)
+    # if anchor[0] == 0:
+    #    return txp.zeros((0, 4), dtype=t_encoded.dtype)
 
     w_a = anchor[:, 2] - anchor[:, 0]  # shape (N, )
     h_a = anchor[:, 3] - anchor[:, 1]  # shape (N, )

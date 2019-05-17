@@ -5,8 +5,8 @@ from torchvision import models
 
 
 class VGG16(nn.Module):
-    def __init__(self, VGG16, pretrained=True):
-        super(VGG16, self).__init__()
+    def __init__(self, pretrained=True):
+        super().__init__()
         self.conv = nn.Sequential(
             # conv1
             nn.Conv2d(3, 64, 3, padding=1),
@@ -47,7 +47,6 @@ class VGG16(nn.Module):
             nn.ReLU(),
             nn.Conv2d(512, 512, 3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(2, 2)
         )
 
         self._init_param(pretrained)

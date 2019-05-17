@@ -23,9 +23,9 @@ class ProposalLayer:
 
     def __call__(self, cls, reg, anchor, img_size, img_scale, phase):
         '''
-        :param cls: (numpy array) cls output by RPN
-        :param reg: (numpy array) reg output by RPN
-        :param anchor: (xp array) generated in RPN
+        :param cls: (numpy array) cls output by RPN, (N, 2)
+        :param reg: (numpy array) reg output by RPN, (N, 4)
+        :param anchor: (xp array) generated in RPN, (N, 4)
         :param img_size: (tuple of ints) array of original image (h, w)
         :param img_scale: (float) image scaling factor
                           in data processing section
@@ -46,7 +46,7 @@ class ProposalLayer:
             n_pre_nms  = self.n_pre_nms_test
             n_post_nms = self.n_post_nms_test
 
-        rois = t_encoded2bbox(anchor, reg)
+        rois = t_encoded2bbox(anchor, reg)  # (N, 4)
         rois[:, slice(0, 4, 2)] = xp.clip(rois[:, slice(0, 4, 2)], 0, img_size[0])  # clipping x-axis
         rois[:, slice(1, 4, 2)] = xp.clip(rois[:, slice(1, 4, 2)], 0, img_size[1])  # clipping y-axis
 
@@ -65,7 +65,7 @@ class ProposalLayer:
         rois = rois[order, :]
 
         # TODO Implement NMS by myself
-        keep = NMS(rois, thresh=self.nms_thresh)
+        keep = NMS(cp.ascontiguousarray(cp.asarray(rois)), thresh=self.nms_thresh)
         if n_post_nms > 0:
             keep = keep[:n_post_nms]
         rois = rois[keep]

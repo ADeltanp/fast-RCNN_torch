@@ -1,7 +1,7 @@
 import cupy as cp
 import torch as t
 from collections import namedtuple
-from torch.autograd import Function
+from torch.autograd import Function, Variable
 from .roi_functions import forward_kernel, backward_kernel
 
 Stream = namedtuple('Stream', ['ptr'])
@@ -9,7 +9,7 @@ Stream = namedtuple('Stream', ['ptr'])
 
 class RoIPooling2D(Function):
     def __init__(self, out_shape, feat_receptive_len, cuda_threads=1024):
-        if len(out_shape.shape) is 1:
+        if isinstance(out_shape, int):
             self.h = self.w = out_shape
         else:
             self.h = out_shape[0]
@@ -32,9 +32,9 @@ class RoIPooling2D(Function):
                                 of shape (batches * rois_per_bat, C, H, W)
         '''
 
-        # must be continuous as we use pointer in C later
-        features = features.continuous()
-        rois = rois.continuous()
+        # must be contiguous as we use pointer in C later
+        features = features.contiguous()
+        rois = rois.contiguous()
 
         feat_size = B, C, H, W = features.size()
         n_rois = rois.size(0)

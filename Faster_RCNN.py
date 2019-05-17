@@ -28,9 +28,11 @@ class Faster_RCNN(nn.Module):
                  rcnn_init_mean=0, rcnn_init_std=0.01,
                  reg_normalize_mean=(0.0, 0.0, 0.0, 0.0),
                  reg_normalize_std=(0.1, 0.1, 0.2, 0.2)):
+        super().__init__()
+
         self.n_class = n_class
         if config.extractor is 'VGG16':
-            self.extractor = VGG16(extractor_pretrained)
+            self.extractor = VGG16(pretrained=extractor_pretrained)
         else:
             raise NotImplementedError('currently only support VGG16')
         self.RPN = RPN('VGG16', anchor_ratio, anchor_scale)
@@ -42,7 +44,6 @@ class Faster_RCNN(nn.Module):
         self.nms_thresh = 0.3
         self.cls_thresh = 0.05
 
-        super(Faster_RCNN, self).__init__()
 
     def forward(self, img, img_size, img_scale, phase):
         feat = self.extractor(img)
