@@ -36,7 +36,7 @@ def generate_anchor_base(base_size=16,
     return anchor
 
 
-def all_anchors(anchor_base, img_size, feat_receptive_len, h, w, phase='test'):
+def all_anchors(anchor_base, img_size, feat_receptive_len, h, w):
     # cupy compatible TODO Compatibility Not Tested
     assert anchor_base.shape[1] == 4
 
@@ -53,15 +53,15 @@ def all_anchors(anchor_base, img_size, feat_receptive_len, h, w, phase='test'):
     anchors = anchor_base[xp.newaxis, :] + ctr_shift[xp.newaxis, :].transpose((1, 0, 2))
     anchors = anchors.reshape((num_base * num_shift, 4)).astype(xp.float32)
     valid_index = np.arange(anchors.shape[0])
-    if phase is 'train':
-        assert len(img_size) == 2
-        valid_index = xp.where(
-            (anchors[:, 0] >= 0) &
-            (anchors[:, 1] >= 0) &
-            (anchors[:, 2] <= img_size[1]) &
-            (anchors[:, 3] <= img_size[0])
-        )[0]
-        anchors = anchors[valid_index, :]
+    # if phase is 'train':
+    #     assert len(img_size) == 2
+    #     valid_index = xp.where(
+    #         (anchors[:, 0] >= 0) &
+    #         (anchors[:, 1] >= 0) &
+    #         (anchors[:, 2] <= img_size[1]) &
+    #         (anchors[:, 3] <= img_size[0])
+    #     )[0]
+    #     anchors = anchors[valid_index, :]
 
     return anchors, valid_index
 
@@ -89,6 +89,7 @@ def t_encoded2bbox(anchor, t_encoded):
     assert anchor.shape[1] == 4
     assert t_encoded.shape[1] == 4
     assert isinstance(anchor, type(t_encoded))
+    assert anchor.dtype == t_encoded.dtype
 
     if isinstance(anchor, t.Tensor):
         txp = t
@@ -133,6 +134,7 @@ def bbox2t_encoded(anchor, target_bbox):
     assert anchor.shape[1] == 4
     assert target_bbox.shape[1] == 4
     assert isinstance(anchor, type(target_bbox))
+    assert anchor.dtype == target_bbox.dtype
 
     if isinstance(anchor, t.Tensor):
         txp = t

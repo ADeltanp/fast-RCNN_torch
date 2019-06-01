@@ -49,7 +49,7 @@ class RPN(nn.Module):
             xp = np
         bat, _, h, w = feat.shape
         anchors, valid_idx = all_anchors(self.anchor_base, img_size,
-                                         self.feat_receptive_len, h, w, phase=phase)
+                                         self.feat_receptive_len, h, w)
         num_anchors = self.anchor_base.shape[0]
 
         shared = self.share(feat)

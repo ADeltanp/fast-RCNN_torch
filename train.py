@@ -7,10 +7,10 @@ from utils.config import config
 from utils import converter, evals
 from train_helper import TrainHelper
 
-import resource
-
-#rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-#resource.setrlimit(resource.RLIMIT_NOFILE, (20480, rlimit[1]))
+# ----- no resource pkg in Windows -----
+# import resource
+# rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+# resource.setrlimit(resource.RLIMIT_NOFILE, (20480, rlimit[1]))
 
 
 def evaluate(testset, faster_rcnn, test_num=10000):
@@ -66,6 +66,9 @@ def train(**kwargs):
             train_helper.train_step(img, bbox, label, scale)
 
             # TODO Add Support for plot_every
+
+            from ipdb import set_trace
+            set_trace()
 
         eval_result = evaluate(test_dataloader, faster_rcnn, test_num=config.test_num)
         lr_ = train_helper.faster_rcnn.optimizer.param_groups[0]['lr']

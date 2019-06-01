@@ -1,6 +1,6 @@
 class Config:
     extractor = 'VGG16'
-    voc_data_dir = '/media/zhangzh/DATA/RtCV/Data/VOCdevkit/VOC2012'
+    voc_data_dir = 'D:\\RtCV\\Data\\VOCdevkit\\VOC2012'
     min_size = 600
     max_size = 1000
     num_workers = 8

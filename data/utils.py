@@ -15,4 +15,4 @@ def resize_bbox(bbox, in_size, out_size):
     # for one bbox, it's (x_min, y_mix, x_max, y_max)
     scale = np.array([x_scale, y_scale, x_scale, y_scale])
     bbox = bbox * scale
-    return bbox
+    return bbox.astype(np.float32)

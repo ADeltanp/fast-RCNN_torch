@@ -57,16 +57,20 @@ class RoIPooling2D(Function):
                        grid=((ctx.cuda_threads + N - 1) // ctx.cuda_threads, 1, 1),
                        stream=stream)
 
-        ctx.save_for_backward(feat_size, rois, max_idx)
+        ctx.rois = rois
+        ctx.feat_size = feat_size
+        ctx.max_idx = max_idx
         # output of shape (batches * rois_per_batch, C=512, H=7, W=7) by default
         return out
 
     def backward(ctx, grad):
-        grad = grad.continuous()
-        feat_size, rois, max_idx = ctx.saved_tensors
-        B, C, H, W = feat_size
-        rois = rois.continuous()
-        max_idx = max_idx.continuous()
+        grad = grad.contiguous()
+        rois = ctx.rois
+        B, C, H, W = ctx.feat_size
+        max_idx = ctx.max_idx
+
+        rois = rois.contiguous()
+        max_idx = max_idx.contiguous()
         out_grad = t.zeros(B, C, H, W).cuda()
         n_rois = rois.size(0)
         N = out_grad.numel()
