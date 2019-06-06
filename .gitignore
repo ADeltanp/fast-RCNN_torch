@@ -4,3 +4,4 @@
 **/__pycache__
 **/_nms_gpu_post.c
 **/_nms_gpu_post.cpython-36m-x86_64-linux-gnu.so
+**/_nms_gpu_post.cp36-win_amd64.pyd

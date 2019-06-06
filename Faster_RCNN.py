@@ -3,6 +3,7 @@ import numpy as np
 import torch as t
 import torch.nn as nn
 import torch.nn.functional as F
+from data.dataset import preprocess
 from models.VGG16 import VGG16
 from models.RPN import RPN
 from models.RCNN import RCNN
@@ -44,7 +45,6 @@ class Faster_RCNN(nn.Module):
         self.nms_thresh = 0.3
         self.cls_thresh = 0.05
 
-
     def forward(self, img, img_size, img_scale, phase):
         feat = self.extractor(img)
         rpn_cls, rpn_reg, roi_list, roi_id, anchors = self.RPN(feat, img_size, img_scale)
@@ -57,8 +57,11 @@ class Faster_RCNN(nn.Module):
         if preset is 'eval':
             self.nms_thresh = 0.3
             self.cls_thresh = 0.05
+        elif preset == 'visualize':
+            self.nms_thresh = 0.3
+            self.cls_thresh = 0.7
         else:
-            raise NotImplementedError('currently only eval preset is available.')
+            raise NotImplementedError('currently only eval and visualize preset is available.')
 
     def _suppress(self, pred_bbox_np, prob_np):
         # inputs (roi_per_img, n_class * 4), # (roi_per_img, n_class)
@@ -85,14 +88,24 @@ class Faster_RCNN(nn.Module):
         return bbox, label, cls_prob
 
     @nograd
-    def predict(self, img, size=None):
+    def predict(self, img, size=None, visualize=False):
         self.eval()
-        self.use_preset('eval')
+        if visualize:
+            self.use_preset('visualize')
+            prep_img = list()
+            size = list()
+            for img_ in img:
+                size_ = img.shape[1:]
+                img_ = preprocess(converter.to_numpy(img_))
+                prep_img.append(img_)
+                size.append(size_)
+        else:
+            prep_img = img
 
         bbox = list()
         label = list()
         cls_prob = list()
-        for img_, size_ in zip(img, size):
+        for img_, size_ in zip(prep_img, size):
             img_ = converter.to_tensor(img[None]).float()
             scale = img_.shape[3] / size_[1]  # (1, C, H, W)[3] = W (no batch here)
 
@@ -125,6 +138,7 @@ class Faster_RCNN(nn.Module):
             label.append(label_)
             cls_prob.append(cls_prob_)
 
+        self.use_preset('eval')
         self.train()
         return bbox, label, cls_prob
 

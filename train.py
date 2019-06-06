@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 from data.dataset import Dataset, TestDataset, un_normalize
 from Faster_RCNN import Faster_RCNN
 from utils.config import config
+from utils.visualizer import visdom_bbox
 from utils import converter, evals
 from train_helper import TrainHelper
 
@@ -56,6 +57,7 @@ def train(**kwargs):
     if config.load_path:
         train_helper.load(config.load_path)
         print('load pretrained model from %s' % config.load_path)
+    train_helper.vis.text(dataset.db.label_names, win='labels')
     best_map = 0
     # --------------- ---- --- ---- --- ---- lr_ = config.lr
     for epoch in range(config.epoch):
@@ -65,16 +67,34 @@ def train(**kwargs):
             img, bbox, label = img.cuda().float(), bbox_.cuda(), label_.cuda()
             train_helper.train_step(img, bbox, label, scale)
 
-            # TODO Add Support for plot_every
+            if (i + 1) % config.plot_every == 0:
+                train_helper.vis.multi_plot(train_helper.get_meter_data())
+                ori_img_ = un_normalize(converter.to_numpy(img[0]))
+                gt_img = visdom_bbox(ori_img_,
+                                     converter.to_numpy(bbox_[0]),
+                                     converter.to_numpy(label_[0]), )
+                train_helper.vis.img('gt_img', gt_img)
+
+                _bbox, _label, _cls = train_helper.faster_rcnn.predict([ori_img_], visualize=True)
+                pred_img = visdom_bbox(ori_img_,
+                                       converter.to_numpy(_bbox[0]),
+                                       converter.to_numpy(_label[0]).reshape(-1),
+                                       converter.to_numpy(_cls[0]),)
+                train_helper.vis.img('pred_img', pred_img)
+
+                train_helper.vis.text(str(train_helper.rpn_cm.value().tolist()), win='rpn_cm')
+                train_helper.vis.img('rcnn_cm', converter.to_tensor(train_helper.rcnn_cm.conf, False).float())
 
             from ipdb import set_trace
             set_trace()
 
         eval_result = evaluate(test_dataloader, faster_rcnn, test_num=config.test_num)
+        train_helper.vis.plot('test_map', eval_result['map'])
         lr_ = train_helper.faster_rcnn.optimizer.param_groups[0]['lr']
         log_info = 'lr:{}, map: {}, loss:{}'.format(str(lr_),
                                                     eval_result['map'],
                                                     str(train_helper.get_meter_data()))
+        train_helper.vis.log(log_info)
 
         if eval_result['map'] > best_map:
             best_map = eval_result['map']

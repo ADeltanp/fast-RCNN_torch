@@ -6,8 +6,10 @@ from torch.nn import functional as F
 from collections import namedtuple
 from torchnet.meter import ConfusionMeter, AverageValueMeter
 from utils.config import config
+from utils.visualizer import Visualizer
 from models.utils.AnchorTargetLayer import AnchorTargetLayer
 from models.utils.ProposalTargetLayer import ProposalTargetLayer
+
 
 LossTuple = namedtuple('LossTuple',
                        ['rpn_reg_loss',
@@ -32,6 +34,7 @@ class TrainHelper(nn.Module):
         self.reg_normalize_std = faster_rcnn.reg_normalize_std
 
         self.optimizer = self.faster_rcnn.get_optimizer()
+        self.vis = Visualizer(env=config.env)
 
         self.rpn_cm = ConfusionMeter(2)
         self.rcnn_cm = ConfusionMeter(config.n_class + 1)
@@ -150,6 +153,8 @@ class TrainHelper(nn.Module):
         save_dict['model'] = self.faster_rcnn.state_dict()
         save_dict['config'] = config._state_dict()
         save_dict['miscellaneous'] = kwargs
+        save_dict['vis_info'] = self.vis.state_dict()
+
         if save_optimizer:
             save_dict['optimizer'] = self.optimizer.state_dict()
 
@@ -162,7 +167,9 @@ class TrainHelper(nn.Module):
         save_dir = os.path.dirname(save_path)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
+
         t.save(save_dict, save_path)
+        self.vis.save([self.vis.env])
         return save_path
 
     def load(self, path, load_optimizer=True, parse_config=False):

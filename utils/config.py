@@ -20,6 +20,10 @@ class Config:
 
     use_adam = False
 
+    env = 'faster-rcnn'
+    port = 8097
+    plot_every = 40
+
     test_num = 10000
 
     load_path = None
