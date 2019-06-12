@@ -1,6 +1,6 @@
 class Config:
     extractor = 'VGG16'
-    voc_data_dir = 'D:\\RtCV\\Data\\VOCdevkit\\VOC2012'
+    voc_data_dir = 'G:\\Zhangzh\\data\\VOCdevkit\\VOC2012'
     min_size = 600
     max_size = 1000
     num_workers = 8
@@ -37,7 +37,7 @@ class Config:
             setattr(self, k, v)
 
     def _state_dict(self):
-        return {k : getattr(self, k) for k, _ in Config.__dict__.items()
+        return {k: getattr(self, k) for k, _ in Config.__dict__.items()
                 if not k.startswith("_")}
 
 

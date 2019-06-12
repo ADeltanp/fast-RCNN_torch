@@ -16,7 +16,7 @@ from models.utils.nms.non_maximum_suppression import non_maximum_suppression as 
 def nograd(f):
     def new_f(*args,**kwargs):
         with t.no_grad():
-           return f(*args,**kwargs)
+            return f(*args,**kwargs)
     return new_f
 
 
@@ -31,13 +31,13 @@ class Faster_RCNN(nn.Module):
                  reg_normalize_std=(0.1, 0.1, 0.2, 0.2)):
         super().__init__()
 
-        self.n_class = n_class
+        self.n_class = n_class + 1
         if config.extractor is 'VGG16':
             self.extractor = VGG16(pretrained=extractor_pretrained)
         else:
             raise NotImplementedError('currently only support VGG16')
         self.RPN = RPN('VGG16', anchor_ratio, anchor_scale)
-        self.RCNN = RCNN(n_class, rcnn_init_mean, rcnn_init_std)
+        self.RCNN = RCNN(n_class + 1, rcnn_init_mean, rcnn_init_std)
 
         self.reg_normalize_mean = reg_normalize_mean
         self.reg_normalize_std = reg_normalize_std
@@ -64,13 +64,13 @@ class Faster_RCNN(nn.Module):
             raise NotImplementedError('currently only eval and visualize preset is available.')
 
     def _suppress(self, pred_bbox_np, prob_np):
-        # inputs (roi_per_img, n_class * 4), # (roi_per_img, n_class)
+        # inputs (roi_per_img, n_class * 4), (roi_per_img, n_class)
         bbox = list()
         label = list()
         cls_prob = list()
         for class_ in range(1, self.n_class):  # 0 is bg
             pred_bbox_ = pred_bbox_np.reshape((-1, self.n_class, 4))[:, class_, :]
-            prob_ = prob_np[class_]
+            prob_ = prob_np[:, class_]
 
             mask = prob_ > self.cls_thresh
             pred_bbox_ = pred_bbox_[mask]
@@ -95,7 +95,7 @@ class Faster_RCNN(nn.Module):
             prep_img = list()
             size = list()
             for img_ in img:
-                size_ = img.shape[1:]
+                size_ = img_.shape[1:]
                 img_ = preprocess(converter.to_numpy(img_))
                 prep_img.append(img_)
                 size.append(size_)
@@ -106,7 +106,7 @@ class Faster_RCNN(nn.Module):
         label = list()
         cls_prob = list()
         for img_, size_ in zip(prep_img, size):
-            img_ = converter.to_tensor(img[None]).float()
+            img_ = converter.to_tensor(img_[None]).float()
             scale = img_.shape[3] / size_[1]  # (1, C, H, W)[3] = W (no batch here)
 
             # cls: (roi_per_img, n_class), reg: (roi_per_img, n_class * 4), rois_np: (roi_per_img, 4)
@@ -124,13 +124,13 @@ class Faster_RCNN(nn.Module):
             roi_reg = roi_reg.view(-1, self.n_class, 4)
             # roi -> view(roi_per_img, 1, 4) -> expand_as(roi_per_img, n_class, 4)
             roi = roi.view(-1, 1, 4).expand_as(roi_reg)
-            pred_bbox = t_encoded2bbox(roi.view((-1, 4)), roi_reg.view((-1, 4)))
-            pred_bbox = pred_bbox.view(-1, self.n_class * 4)  # (roi_per_img, n_class * 4)
+            pred_bbox = t_encoded2bbox(roi.contiguous().view((-1, 4)), roi_reg.view((-1, 4)))
+            pred_bbox = pred_bbox.contiguous().view(-1, self.n_class * 4)  # (roi_per_img, n_class * 4)
 
-            pred_bbox[:, 1::2] = (pred_bbox[:, 1::2]).clamp(min=0, max=size[0])  # clip height
-            pred_bbox[:, 0::2] = (pred_bbox[:, 0::2]).clamp(min=0, max=size[1])  # clip width
+            pred_bbox[:, 1::2] = (pred_bbox[:, 1::2]).clamp(min=0, max=size_[0])  # clip height
+            pred_bbox[:, 0::2] = (pred_bbox[:, 0::2]).clamp(min=0, max=size_[1])  # clip width
 
-            prob_np = converter.to_numpy(F.softmax(roi_cls))
+            prob_np = converter.to_numpy(F.softmax(roi_cls, dim=1))
             pred_bbox_np = converter.to_numpy(pred_bbox)
 
             bbox_, label_, cls_prob_ = self._suppress(pred_bbox_np, prob_np)

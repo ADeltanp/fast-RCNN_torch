@@ -23,7 +23,7 @@ def preprocess(img, min_size=600, max_size=1000):
 
     normalize = tvt.Normalize(mean=[0.485, 0.456, 0.406],
                               std=[0.229, 0.224, 0.225])
-    img = normalize(t.from_numpy(img)).numpy()
+    img = normalize(t.from_numpy(img.astype(np.float32))).numpy()
 
     return img
 

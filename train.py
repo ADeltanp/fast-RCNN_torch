@@ -76,6 +76,9 @@ def train(**kwargs):
                 train_helper.vis.img('gt_img', gt_img)
 
                 _bbox, _label, _cls = train_helper.faster_rcnn.predict([ori_img_], visualize=True)
+                print(_bbox[0].shape)
+                from ipdb import set_trace
+                set_trace()
                 pred_img = visdom_bbox(ori_img_,
                                        converter.to_numpy(_bbox[0]),
                                        converter.to_numpy(_label[0]).reshape(-1),
@@ -84,9 +87,8 @@ def train(**kwargs):
 
                 train_helper.vis.text(str(train_helper.rpn_cm.value().tolist()), win='rpn_cm')
                 train_helper.vis.img('rcnn_cm', converter.to_tensor(train_helper.rcnn_cm.conf, False).float())
-
-            from ipdb import set_trace
-            set_trace()
+                from ipdb import set_trace
+                set_trace()
 
         eval_result = evaluate(test_dataloader, faster_rcnn, test_num=config.test_num)
         train_helper.vis.plot('test_map', eval_result['map'])

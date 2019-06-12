@@ -187,7 +187,7 @@ class TrainHelper(nn.Module):
     def update_meters(self, losses):
         loss_dict = {k: converter.to_tensor(v) for k, v in losses._asdict().items()}
         for key, meter in self.meters.items():
-            meter.add(loss_dict[key])
+            meter.add(loss_dict[key].cpu())
 
     def reset_meters(self):
         for key, meter in self.meters.items():

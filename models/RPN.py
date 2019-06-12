@@ -75,7 +75,7 @@ class RPN(nn.Module):
                 img_scale,
                 phase
             )
-            batch_id = i * np.ones((len(roi),), dtype=xp.int32)
+            batch_id = i * np.ones((len(roi),), dtype=xp.float32)
             roi_list.append(roi)
             roi_id.append(batch_id)
 

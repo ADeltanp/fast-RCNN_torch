@@ -14,7 +14,7 @@ class RCNN(nn.Module):
                  roi_pooled_shape=7,
                  feat_receptive_len=16):
         super().__init__()
-        self.n_class = n_class + 1
+        self.n_class = n_class
 
         self.roi_pool = RoIPooling2D(roi_pooled_shape, feat_receptive_len)
         self.fcs = nn.Sequential(  # fc6 & fc7 of original VGG16
